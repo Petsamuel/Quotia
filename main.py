@@ -8,6 +8,11 @@ from fastapi_cache.backends.inmemory import InMemoryBackend
 from fastapi_cache.decorator import cache
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
+import logging
+
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger(__name__)
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -65,13 +70,12 @@ async def scrape_url(session, url):
         print(f"Error scraping {url}: {e}")
         return []
 
-@app.get("/")
-async def read_Root():
-    return {"name": "Quotes", "versions":"0.0.1", "description":"Web Scraping Quote Generator", "contact": "support@Scraping.com"}
 
-@app.get("/quotes", response_class=JSONResponse)
+
+@app.get("/", response_class=JSONResponse)
 @cache(expire=300) # Cache the response for 300 seconds
 async def getQuotes(category: str = Query(None, description="Category of quotes to scrape")):
+    logger.debug("Root endpoint called")
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3"
     }
@@ -95,4 +99,4 @@ async def getQuotes(category: str = Query(None, description="Category of quotes 
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("main:app", host="127.0.0.1", port=8000, reload=True)
+    uvicorn.run("main:app", host="127.0.0.1", port=8080, reload=True)

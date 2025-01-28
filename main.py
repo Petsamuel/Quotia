@@ -7,7 +7,16 @@ from fastapi_cache import FastAPICache
 from fastapi_cache.backends.inmemory import InMemoryBackend
 from fastapi_cache.decorator import cache
 from fastapi.middleware.cors import CORSMiddleware
-app = FastAPI()
+from contextlib import asynccontextmanager
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Code to run on startup
+    FastAPICache.init(InMemoryBackend(), prefix="fastapi-cache")
+    yield
+    # Code to run on shutdown (if needed)
+
+app = FastAPI(lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -55,10 +64,6 @@ async def scrape_url(session, url):
     except Exception as e:
         print(f"Error scraping {url}: {e}")
         return []
-
-@app.on_event("startup")
-async def startup():
-    FastAPICache.init(InMemoryBackend(), prefix="fastapi-cache")
 
 @app.get("/", response_class=JSONResponse)
 @cache(expire=300) # Cache the response for 300 seconds

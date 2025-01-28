@@ -7,10 +7,8 @@ from fastapi_cache import FastAPICache
 from fastapi_cache.backends.inmemory import InMemoryBackend
 from fastapi_cache.decorator import cache
 from fastapi.middleware.cors import CORSMiddleware
-from contextlib import asynccontextmanager
 import logging
-from typing import List, Dict, Optional
-from aiohttp import ClientTimeout
+from typing import Optional, Dict, List
 
 # Enhanced logging configuration
 logging.basicConfig(
@@ -19,17 +17,10 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Custom timeout for HTTP requests
-TIMEOUT = ClientTimeout(total=30)
+app = FastAPI()
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    logger.info("Initializing FastAPI Cache")
-    FastAPICache.init(InMemoryBackend(), prefix="fastapi-cache")
-    yield
-    logger.info("Shutting down application")
-
-app = FastAPI(lifespan=lifespan)
+# Initialize cache immediately
+FastAPICache.init(InMemoryBackend(), prefix="fastapi-cache")
 
 app.add_middleware(
     CORSMiddleware,
@@ -40,22 +31,19 @@ app.add_middleware(
 )
 
 async def fetch(session: aiohttp.ClientSession, url: str) -> str:
-    """Fetch the HTML content of a URL asynchronously with better error handling."""
+    """Fetch the HTML content of a URL asynchronously."""
     try:
-        async with session.get(url, timeout=TIMEOUT) as response:
+        async with session.get(url) as response:
             if response.status != 200:
                 logger.error(f"Error fetching {url}: Status {response.status}")
-                raise HTTPException(status_code=response.status, detail=f"Failed to fetch {url}")
+                return ""
             return await response.text()
-    except asyncio.TimeoutError:
-        logger.error(f"Timeout while fetching {url}")
-        raise HTTPException(status_code=504, detail="Request timeout")
     except Exception as e:
         logger.error(f"Error fetching {url}: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Failed to fetch {url}: {str(e)}")
+        return ""
 
 async def scrape_quotes_toscrape(soup: BeautifulSoup) -> List[Dict[str, str]]:
-    """Scrape quotes from quotes.toscrape.com with better error handling."""
+    """Scrape quotes from quotes.toscrape.com."""
     quotes = []
     try:
         for quote in soup.find_all("div", class_="quote"):
@@ -72,7 +60,7 @@ async def scrape_quotes_toscrape(soup: BeautifulSoup) -> List[Dict[str, str]]:
     return quotes
 
 async def scrape_quotes_goodreads(soup: BeautifulSoup) -> List[Dict[str, str]]:
-    """Scrape quotes from goodreads.com with better error handling."""
+    """Scrape quotes from goodreads.com."""
     quotes = []
     try:
         for quote in soup.find_all("div", class_="quoteText"):
@@ -89,18 +77,19 @@ async def scrape_quotes_goodreads(soup: BeautifulSoup) -> List[Dict[str, str]]:
     return quotes
 
 async def scrape_url(session: aiohttp.ClientSession, url: str) -> List[Dict[str, str]]:
-    """Scrape quotes from a single URL with enhanced error handling."""
+    """Scrape quotes from a single URL."""
     try:
         html = await fetch(session, url)
+        if not html:
+            return []
+        
         soup = BeautifulSoup(html, "html.parser")
         
         if "toscrape" in url:
             return await scrape_quotes_toscrape(soup)
         elif "goodreads" in url:
             return await scrape_quotes_goodreads(soup)
-        else:
-            logger.warning(f"Unsupported URL format: {url}")
-            return []
+        return []
     except Exception as e:
         logger.error(f"Error scraping {url}: {str(e)}")
         return []
@@ -110,10 +99,7 @@ async def scrape_url(session: aiohttp.ClientSession, url: str) -> List[Dict[str,
 async def get_quotes(
     category: Optional[str] = Query(None, description="Category of quotes to scrape")
 ) -> Dict[str, List[Dict[str, str]]]:
-    """
-    Fetch quotes from multiple sources with optional category filtering.
-    Returns a JSON response with the combined quotes.
-    """
+    """Fetch quotes from multiple sources."""
     logger.info(f"Processing request for category: {category}")
     
     headers = {
@@ -153,4 +139,4 @@ async def get_quotes(
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("main:app", host="127.0.0.1", port=8080, reload=True)
+    uvicorn.run(app, host="127.0.0.1", port=8080, reload=True)

@@ -65,6 +65,10 @@ async def scrape_url(session, url):
         print(f"Error scraping {url}: {e}")
         return []
 
+@app.get("/")
+async def read_Root():
+    return {"name": "Quotes", "versions":"0.0.1", "description":"Web Scraping Quote Generator", "contact": "support@Scraping.com"}
+
 @app.get("/", response_class=JSONResponse)
 @cache(expire=300) # Cache the response for 300 seconds
 async def getQuotes(category: str = Query(None, description="Category of quotes to scrape")):

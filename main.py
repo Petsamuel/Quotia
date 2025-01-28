@@ -6,7 +6,16 @@ import asyncio
 from fastapi_cache import FastAPICache
 from fastapi_cache.backends.inmemory import InMemoryBackend
 from fastapi_cache.decorator import cache
+from fastapi.middleware.cors import CORSMiddleware
 app = FastAPI()
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"], 
+    allow_credentials=True,
+    allow_methods=["*"],   
+    allow_headers=["*"],   
+)
 
 async def fetch(session, url):
     """Fetch the HTML content of a URL asynchronously."""

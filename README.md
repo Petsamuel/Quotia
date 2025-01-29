@@ -15,8 +15,8 @@ This project demonstrates how to perform asynchronous web scraping using FastAPI
 1. Clone the repository:
 
     ```bash
-    git clone https://github.com/yourusername/async-web-scraper.git
-    cd async-web-scraper
+    git clone https://github.com/Petsamuel/Quotes.git
+   
     ```
 
 2. Create a virtual environment and activate it:
@@ -37,7 +37,7 @@ This project demonstrates how to perform asynchronous web scraping using FastAPI
 1. Start the FastAPI server:
 
     ```bash
-    uvicorn src.main:app --reload
+    uvicorn main:app --reload
     ```
 
 2. Open your browser and navigate to `http://127.0.0.1:8000/` to see the scraped quotes.

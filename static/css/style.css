@@ -1,0 +1,83 @@
+:root {
+    --color-background: #F2F0EA;
+    --color-text: #050505;
+    --color-accent: #FF3333;
+}
+
+body {
+    background-color: var(--color-background);
+    color: var(--color-text);
+    font-family: 'Space Mono', monospace;
+    cursor: none;
+}
+
+@media (max-width: 768px) {
+    body {
+        cursor: auto;
+    }
+
+    .cursor {
+        display: none;
+    }
+}
+
+.font-serif {
+    font-family: 'Playfair Display', serif;
+}
+
+.font-mono {
+    font-family: 'Space Mono', monospace;
+}
+
+.bg-stone-100 {
+    background-color: var(--color-background);
+}
+
+.text-ink {
+    color: var(--color-text);
+}
+
+.text-accent {
+    color: var(--color-accent);
+}
+
+.border-ink {
+    border-color: var(--color-text);
+}
+
+.cursor {
+    width: 20px;
+    height: 20px;
+    border: 1px solid var(--color-text);
+    border-radius: 50%;
+    position: fixed;
+    pointer-events: none;
+    transform: translate(-50%, -50%);
+    transition: width 0.2s, height 0.2s;
+    z-index: 9999;
+}
+
+.cursor.hover {
+    width: 40px;
+    height: 40px;
+}
+
+.hover-invert {
+    transition: background-color 0.2s, color 0.2s;
+}
+
+.hover-invert:hover {
+    background-color: var(--color-text);
+    color: var(--color-background);
+}
+
+.reveal {
+    clip-path: polygon(0 100%, 100% 100%, 100% 100%, 0 100%);
+    transition: clip-path 0.8s cubic-bezier(0.19, 1, 0.22, 1);
+    transform: translateY(10px);
+}
+
+.reveal.visible {
+    clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%);
+    transform: translateY(0);
+}

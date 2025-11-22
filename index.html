@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quotia - Asynchronous Quote-Scraping API</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=Space+Mono&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="static/css/style.css">
+</head>
+<body class="bg-stone-100 text-ink">
+
+    <div id="cursor" class="cursor"></div>
+
+    <header class="fixed top-0 left-0 right-0 p-4 md:p-8 flex justify-between items-center z-50">
+        <div class="logo">
+            <img src="static/assets/logo.svg" alt="Quotia Logo" class="h-6 md:h-8">
+        </div>
+        <nav>
+            <a href="/docs" class="font-mono text-xs md:text-sm hover:text-accent">/docs</a>
+        </nav>
+    </header>
+
+    <main class="container mx-auto px-4 md:px-8 py-24 md:py-32">
+        <section class="hero mb-24 md:mb-32">
+            <h1 class="text-5xl md:text-8xl font-serif font-bold leading-none reveal">
+                Asynchronous<br>
+                Quote-Scraping<br>
+                <span class="text-accent">API</span>
+            </h1>
+        </section>
+
+        <section class="grid grid-cols-1 md:grid-cols-12 gap-8 mb-24 md:mb-32">
+            <div class="col-span-1 md:col-span-4">
+                <h2 class="text-3xl md:text-4xl font-serif font-bold reveal">What is Quotia?</h2>
+            </div>
+            <div class="col-span-1 md:col-span-8">
+                <p class="text-base md:text-lg font-mono reveal">
+                    Quotia is a developer-focused API for scraping quotes from multiple sources in parallel. It's built for speed and reliability, delivering clean, structured JSON data with minimal fuss. No more dealing with complex scraping logic or maintaining brittle parsers.
+                </p>
+            </div>
+        </section>
+
+        <section class="grid grid-cols-1 md:grid-cols-12 gap-8 mb-24 md:mb-32">
+            <div class="col-span-1 md:col-span-4">
+                <h2 class="text-3xl md:text-4xl font-serif font-bold reveal">Why it Matters</h2>
+            </div>
+            <div class="col-span-1 md:col-span-8 grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div class="card p-6 md:p-8 border border-ink border-opacity-10 hover-invert">
+                    <h3 class="text-xl md:text-2xl font-serif font-bold mb-4">Fast & Parallel</h3>
+                    <p class="font-mono text-sm">
+                        Leverage asynchronous scraping to pull data from multiple sources simultaneously. Get the data you need, faster.
+                    </p>
+                </div>
+                <div class="card p-6 md:p-8 border border-ink border-opacity-10 hover-invert">
+                    <h3 class="text-xl md:text-2xl font-serif font-bold mb-4">Clean JSON</h3>
+                    <p class="font-mono text-sm">
+                        Responses are predictable and well-structured. Spend less time parsing and more time building.
+                    </p>
+                </div>
+            </div>
+        </section>
+
+        <section class="mb-24 md:mb-32">
+            <h2 class="text-3xl md:text-4xl font-serif font-bold mb-8 reveal">Simple Endpoint</h2>
+            <div class="bg-white p-6 md:p-8 border border-ink border-opacity-10 overflow-x-auto">
+                <pre class="font-mono text-sm"><code class="language-bash">GET /v1/quote?sources=goodreads,brainyquote</code></pre>
+            </div>
+        </section>
+
+        <section class="mb-24 md:mb-32">
+            <h2 class="text-3xl md:text-4xl font-serif font-bold mb-8 reveal">Quickstart</h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div class="bg-white p-6 md:p-8 border border-ink border-opacity-10 overflow-x-auto">
+                    <h3 class="text-base md:text-lg font-mono font-bold mb-4">JavaScript</h3>
+                    <pre class="font-mono text-sm"><code class="language-js">fetch('https://api.quotia.io/v1/quote?sources=all')
+  .then(response => response.json())
+  .then(data => console.log(data));</code></pre>
+                </div>
+                <div class="bg-white p-6 md:p-8 border border-ink border-opacity-10 overflow-x-auto">
+                    <h3 class="text-base md:text-lg font-mono font-bold mb-4">Python</h3>
+                    <pre class="font-mono text-sm"><code class="language-python">import requests
+
+response = requests.get('https://api.quotia.io/v1/quote?sources=all')
+print(response.json())</code></pre>
+                </div>
+            </div>
+        </section>
+
+        <section id="quotes-section" class="mb-24 md:mb-32">
+            <h2 class="text-3xl md:text-4xl font-serif font-bold mb-8 reveal">Live Quotes</h2>
+            <div id="quotes-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                <!-- Quotes will be injected here -->
+            </div>
+        </section>
+
+        <section id="docs" class="text-center py-24 md:py-32">
+            <a href="#" class="text-3xl md:text-4xl font-serif font-bold hover:text-accent reveal">
+                Read the Docs
+            </a>
+        </section>
+
+    </main>
+
+    <footer class="text-center p-8 font-mono text-xs">
+        &copy; 2025 Quotia
+    </footer>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.9.1/gsap.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.9.1/ScrollTrigger.min.js"></script>
+    <script src="static/js/script.js"></script>
+</body>
+</html>

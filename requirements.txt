@@ -4,4 +4,4 @@ beautifulsoup4
 requests
 python-multipart
 aiohttp
-fastapi_cache
+fastapi_cache2

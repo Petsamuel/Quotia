@@ -1,7 +1,8 @@
 # Read the doc: https://huggingface.co/docs/hub/spaces-sdks-docker
 # you will also find guides on how best to write your Dockerfile
 
-FROM python:3.9
+# 3.10+ required: the MCP SDK does not support 3.9.
+FROM python:3.12
 
 RUN useradd -m -u 1000 user
 USER user

@@ -147,7 +147,15 @@ body {
     margin-top: auto;
 }
 
-.quote-copy {
+.quote-actions {
+    flex-shrink: 0;
+    display: flex;
+    gap: 0.4rem;
+    position: relative;
+}
+
+.quote-copy,
+.quote-share {
     flex-shrink: 0;
     display: inline-flex;
     align-items: center;
@@ -162,11 +170,14 @@ body {
     transition: opacity 0.2s, color 0.2s, border-color 0.2s;
 }
 
-.quote-card:hover .quote-copy {
+.quote-card:hover .quote-copy,
+.quote-card:hover .quote-share {
     opacity: 0.75;
 }
 
-.quote-copy:hover {
+.quote-copy:hover,
+.quote-share:hover,
+.quote-share[aria-expanded="true"] {
     opacity: 1;
 }
 
@@ -176,13 +187,58 @@ body {
     opacity: 1;
 }
 
+/* Share menu. Colors are set explicitly so the menu stays legible while the
+   parent card is inverted by .hover-invert. */
+.share-menu {
+    position: absolute;
+    top: calc(100% + 0.4rem);
+    right: 0;
+    z-index: 40;
+    min-width: 172px;
+    background-color: var(--color-background);
+    color: var(--color-text);
+    border: 1px solid var(--color-text);
+    display: none;
+}
+
+.share-menu.open {
+    display: block;
+}
+
+.share-menu button {
+    display: block;
+    width: 100%;
+    text-align: left;
+    padding: 0.6rem 0.9rem;
+    font-family: 'Space Mono', monospace;
+    font-size: 0.72rem;
+    letter-spacing: 0.03em;
+    color: inherit;
+    background: none;
+    border: 0;
+    cursor: none;
+    transition: background-color 0.15s, color 0.15s;
+}
+
+.share-menu button:hover {
+    background-color: var(--color-text);
+    color: var(--color-background);
+}
+
+.share-menu button + button {
+    border-top: 1px solid rgba(5, 5, 5, 0.1);
+}
+
 @media (max-width: 768px) {
     .quote-select,
-    .quote-copy {
+    .quote-copy,
+    .quote-share,
+    .share-menu button {
         cursor: pointer;
     }
 
-    .quote-copy {
+    .quote-copy,
+    .quote-share {
         opacity: 0.75;
     }
 }

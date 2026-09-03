@@ -121,6 +121,177 @@ function animateQuoteCards(cards) {
 
 const COPY_ICON = `<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="1"/><path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1"/></svg>`;
 
+const SHARE_ICON = `<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.6 13.5l6.8 4M15.4 6.5l-6.8 4"/></svg>`;
+
+function quoteToText(quote) {
+    return `“${quote.text}” — ${quote.author}`;
+}
+
+function closeAllShareMenus() {
+    document.querySelectorAll('.share-menu.open').forEach(menu => {
+        menu.classList.remove('open');
+        const button = menu.previousElementSibling;
+        if (button) button.setAttribute('aria-expanded', 'false');
+    });
+}
+
+document.addEventListener('click', event => {
+    if (!event.target.closest('.quote-actions')) closeAllShareMenus();
+});
+
+document.addEventListener('keydown', event => {
+    if (event.key === 'Escape') closeAllShareMenus();
+});
+
+function shareToPlatform(platform, quote) {
+    const text = quoteToText(quote);
+    const url = window.location.origin || 'https://quotia.io';
+    const urls = {
+        x: `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`,
+        whatsapp: `https://wa.me/?text=${encodeURIComponent(`${text} ${url}`)}`,
+        linkedin: `https://www.linkedin.com/feed/?shareActive=true&text=${encodeURIComponent(`${text} ${url}`)}`,
+    };
+    window.open(urls[platform], '_blank', 'noopener,noreferrer');
+}
+
+async function shareNative(quote) {
+    try {
+        await navigator.share({
+            title: 'Quotia',
+            text: quoteToText(quote),
+            url: window.location.origin || 'https://quotia.io',
+        });
+    } catch (error) {
+        if (error && error.name !== 'AbortError') console.error('Share failed:', error);
+    }
+}
+
+// Renders the quote onto a square canvas in the site's palette, so the shared
+// image is readable on its own without the surrounding page.
+async function renderQuoteImage(quote) {
+    const SIZE = 1080;
+    const PAD = 110;
+    const canvas = document.createElement('canvas');
+    canvas.width = SIZE;
+    canvas.height = SIZE;
+    const ctx = canvas.getContext('2d');
+
+    if (document.fonts && document.fonts.ready) {
+        try { await document.fonts.ready; } catch (error) { /* fall back to system fonts */ }
+    }
+
+    ctx.fillStyle = '#F2F0EA';
+    ctx.fillRect(0, 0, SIZE, SIZE);
+    ctx.strokeStyle = '#050505';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(48, 48, SIZE - 96, SIZE - 96);
+
+    // Fit the quote by stepping the type size down until it fits the text box.
+    const maxWidth = SIZE - PAD * 2;
+    const maxTextHeight = SIZE - PAD * 2 - 190;
+    let fontSize = 62;
+    let lines = [];
+
+    for (; fontSize >= 26; fontSize -= 2) {
+        ctx.font = `${fontSize}px "Playfair Display", Georgia, serif`;
+        lines = [];
+        let line = '';
+        for (const word of `“${quote.text}”`.split(/\s+/)) {
+            const candidate = line ? `${line} ${word}` : word;
+            if (ctx.measureText(candidate).width > maxWidth && line) {
+                lines.push(line);
+                line = word;
+            } else {
+                line = candidate;
+            }
+        }
+        if (line) lines.push(line);
+        if (lines.length * (fontSize * 1.35) <= maxTextHeight) break;
+    }
+
+    const lineHeight = fontSize * 1.35;
+    let y = PAD + 40 + lineHeight;
+    ctx.fillStyle = '#050505';
+    ctx.textBaseline = 'alphabetic';
+    lines.forEach(l => {
+        ctx.fillText(l, PAD, y);
+        y += lineHeight;
+    });
+
+    ctx.fillStyle = '#FF3333';
+    ctx.fillRect(PAD, y + 6, 90, 4);
+
+    ctx.fillStyle = '#050505';
+    ctx.font = `bold 40px "Playfair Display", Georgia, serif`;
+    ctx.fillText(quote.author, PAD, y + 84);
+
+    ctx.font = `22px "Space Mono", monospace`;
+    ctx.fillStyle = 'rgba(5,5,5,0.55)';
+    ctx.fillText('quotia.io', PAD, SIZE - PAD + 24);
+    if (quote.source) {
+        const attribution = `via ${quote.source}`;
+        ctx.fillText(attribution, SIZE - PAD - ctx.measureText(attribution).width, SIZE - PAD + 24);
+    }
+
+    return new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+}
+
+function quoteFileName(quote) {
+    const slug = (quote.author || 'quote').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+    return `quotia-${slug || 'quote'}.png`;
+}
+
+async function shareQuoteImage(quote) {
+    try {
+        const blob = await renderQuoteImage(quote);
+        if (!blob) throw new Error('Canvas produced no image');
+        const file = new File([blob], quoteFileName(quote), { type: 'image/png' });
+
+        if (navigator.canShare && navigator.canShare({ files: [file] })) {
+            await navigator.share({ files: [file], text: quoteToText(quote) });
+            return;
+        }
+
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = file.name;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (error) {
+        if (error && error.name !== 'AbortError') console.error('Image share failed:', error);
+    }
+}
+
+function buildShareMenu(quote) {
+    const menu = document.createElement('div');
+    menu.className = 'share-menu';
+
+    const items = [];
+    if (navigator.share) items.push(['Share…', () => shareNative(quote)]);
+    items.push(
+        ['Post on X', () => shareToPlatform('x', quote)],
+        ['WhatsApp', () => shareToPlatform('whatsapp', quote)],
+        ['LinkedIn', () => shareToPlatform('linkedin', quote)],
+        ['Save as image', () => shareQuoteImage(quote)],
+    );
+
+    items.forEach(([label, action]) => {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.textContent = label;
+        button.addEventListener('click', () => {
+            closeAllShareMenus();
+            action();
+        });
+        menu.appendChild(button);
+    });
+
+    return menu;
+}
+
 function initCategoryFilter() {
     const select = document.getElementById('category-select');
     if (!select) return;
@@ -141,16 +312,42 @@ function buildQuoteCard(quote) {
     text.textContent = `“${quote.text}”`;
     text.title = quote.text;
 
-    const button = document.createElement('button');
-    button.type = 'button';
-    button.className = 'quote-copy';
-    button.title = 'Copy quote';
-    button.setAttribute('aria-label', `Copy quote by ${quote.author}`);
-    button.innerHTML = COPY_ICON;
-    button.addEventListener('click', () => copyQuote(button, quote));
+    const actions = document.createElement('div');
+    actions.className = 'quote-actions';
+
+    const copyButton = document.createElement('button');
+    copyButton.type = 'button';
+    copyButton.className = 'quote-copy';
+    copyButton.title = 'Copy quote';
+    copyButton.setAttribute('aria-label', `Copy quote by ${quote.author}`);
+    copyButton.innerHTML = COPY_ICON;
+    copyButton.addEventListener('click', () => copyQuote(copyButton, quote));
+
+    const shareButton = document.createElement('button');
+    shareButton.type = 'button';
+    shareButton.className = 'quote-share';
+    shareButton.title = 'Share quote';
+    shareButton.setAttribute('aria-label', `Share quote by ${quote.author}`);
+    shareButton.setAttribute('aria-haspopup', 'true');
+    shareButton.setAttribute('aria-expanded', 'false');
+    shareButton.innerHTML = SHARE_ICON;
+
+    const menu = buildShareMenu(quote);
+    shareButton.addEventListener('click', () => {
+        const isOpen = menu.classList.contains('open');
+        closeAllShareMenus();
+        if (!isOpen) {
+            menu.classList.add('open');
+            shareButton.setAttribute('aria-expanded', 'true');
+        }
+    });
+
+    actions.appendChild(copyButton);
+    actions.appendChild(shareButton);
+    actions.appendChild(menu);
 
     head.appendChild(text);
-    head.appendChild(button);
+    head.appendChild(actions);
 
     const author = document.createElement('h3');
     author.className = 'text-lg font-serif font-bold quote-card__author';

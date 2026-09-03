@@ -15,8 +15,12 @@ from fastapi_cache.backends.inmemory import InMemoryBackend
 from fastapi_cache.decorator import cache
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
+from mcp.server.mcpserver import MCPServer
+from mcp.server.transport_security import TransportSecuritySettings
 import logging
 import os
+import random
+from contextlib import asynccontextmanager
 from functools import lru_cache
 from math import ceil
 from pathlib import Path
@@ -62,6 +66,14 @@ MAX_SOURCE_PAGES = 5
 # Rough number of quotes one page of one source yields. Only used to decide how
 # many source pages to request; the real count is whatever comes back.
 QUOTES_PER_SOURCE_PAGE = 10
+
+# Categories verified to return results on both sources. Tags are open-ended, so
+# this is the vetted set rather than an exhaustive one; it backs the MCP
+# list_categories tool and mirrors the dropdown on the landing page.
+KNOWN_CATEGORIES = [
+    "books", "friendship", "happiness", "humor", "inspirational", "life",
+    "love", "poetry", "reading", "success", "truth", "wisdom",
+]
 
 DESCRIPTION = """
 A quote API for developers. One endpoint returns quotes as clean, paginated JSON,
@@ -179,6 +191,12 @@ class ErrorResponse(BaseModel):
     detail: str = Field(..., description="Human-readable description of what went wrong.")
 
     model_config = {"json_schema_extra": {"examples": [{"detail": "Internal server error"}]}}
+
+
+class CategoryList(BaseModel):
+    """The set of category values known to return results."""
+
+    categories: List[str] = Field(..., description="Category values that can be passed as `category`.")
 
 # Initialize cache immediately
 FastAPICache.init(InMemoryBackend(), prefix="fastapi-cache")
@@ -412,8 +430,8 @@ async def fetch(session: aiohttp.ClientSession, url: str) -> str:
 QUOTE_MARKS = ' \t\r\n"“”‘’\''
 
 def clean_quote_text(raw: str) -> str:
-    """Trim whitespace and any enclosing quotation marks from a scraped quote."""
-    return raw.strip().strip(QUOTE_MARKS).strip()
+    """Trim enclosing quotation marks and collapse whitespace runs to single spaces."""
+    return " ".join(raw.split()).strip(QUOTE_MARKS).strip()
 
 async def scrape_quotes_toscrape(soup: BeautifulSoup) -> List[Dict[str, Any]]:
     """Scrape quotes from quotes.toscrape.com."""
@@ -453,7 +471,9 @@ async def scrape_quotes_goodreads(soup: BeautifulSoup) -> List[Dict[str, Any]]:
     quotes = []
     try:
         for quote in soup.find_all("div", class_="quoteText"):
-            text_parts = quote.get_text(strip=True).split("―")
+            # separator=" " matters: goodreads uses <br> inside quotes, and without
+            # it the surrounding words are concatenated ("glitter,Not all those").
+            text_parts = quote.get_text(separator=" ", strip=True).split("―")
             author = quote.find("span", class_="authorOrTitle")
             if text_parts and author:
                 quotes.append({
@@ -513,6 +533,67 @@ async def scrape_url(session: aiohttp.ClientSession, url: str) -> List[Dict[str,
         logger.error(f"Error scraping {url}: {str(e)}")
         return []
 
+# The shared core. Both the REST route and the MCP tools call this directly —
+# an MCP tool must never reach the API by making an HTTP request back to this
+# same process. Caching lives here so both surfaces get it.
+@cache(expire=300)
+async def fetch_quotes(
+    category: Optional[str] = None,
+    page: int = 1,
+    page_size: int = DEFAULT_PAGE_SIZE,
+) -> Dict[str, Any]:
+    """
+    Fetch quotes from every configured source, merge them, and return one page.
+
+    Each source is queried concurrently; a source that fails or returns a
+    non-200 status is logged and skipped rather than failing the whole request.
+    Duplicates across sources are removed before paging, and page 1 of every
+    source is fetched before page 2 of any, so lower `page` values hold the
+    most prominent quotes.
+
+    Results are cached for 5 minutes per `category`/`page`/`page_size`.
+    """
+    category = (category or "").strip().lower() or None
+    logger.info(f"Processing request for category={category} page={page} page_size={page_size}")
+
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+    }
+
+    # Only scrape as deep as the requested window needs, up to the cap.
+    needed = page * page_size
+    source_pages = min(MAX_SOURCE_PAGES, ceil(needed / QUOTES_PER_SOURCE_PAGE))
+    urls = build_source_urls(category, source_pages)
+
+    async with aiohttp.ClientSession(headers=headers) as session:
+        tasks = [scrape_url(session, url) for url in urls]
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+
+        all_quotes = []
+        for result in results:
+            if isinstance(result, list):
+                all_quotes.extend(result)
+            else:
+                logger.error(f"Error in gathering results: {str(result)}")
+
+        unique_quotes = deduplicate(all_quotes)
+        total = len(unique_quotes)
+        total_pages = ceil(total / page_size)
+        start = (page - 1) * page_size
+        window = unique_quotes[start:start + page_size]
+
+        logger.info(f"Retrieved {total} unique quotes, returning {len(window)} for page {page}")
+        return {
+            "quotes": window,
+            "category": category,
+            "page": page,
+            "page_size": page_size,
+            "total": total,
+            "total_pages": total_pages,
+            "has_next": page < total_pages,
+            "has_previous": page > 1,
+        }
+
 @app.get(
     QUOTES_ENDPOINT,
     response_class=JSONResponse,
@@ -526,7 +607,6 @@ async def scrape_url(session: aiohttp.ClientSession, url: str) -> List[Dict[str,
         }
     },
 )
-@cache(expire=300)
 async def get_quotes(
     category: Optional[str] = Query(
         None,
@@ -563,50 +643,110 @@ async def get_quotes(
 
     Responses are cached for 5 minutes per `category`/`page`/`page_size`.
     """
-    category = (category or "").strip().lower() or None
-    logger.info(f"Processing request for category={category} page={page} page_size={page_size}")
-
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
-    }
-
-    # Only scrape as deep as the requested window needs, up to the cap.
-    needed = page * page_size
-    source_pages = min(MAX_SOURCE_PAGES, ceil(needed / QUOTES_PER_SOURCE_PAGE))
-    urls = build_source_urls(category, source_pages)
-
     try:
-        async with aiohttp.ClientSession(headers=headers) as session:
-            tasks = [scrape_url(session, url) for url in urls]
-            results = await asyncio.gather(*tasks, return_exceptions=True)
-
-            all_quotes = []
-            for result in results:
-                if isinstance(result, list):
-                    all_quotes.extend(result)
-                else:
-                    logger.error(f"Error in gathering results: {str(result)}")
-
-            unique_quotes = deduplicate(all_quotes)
-            total = len(unique_quotes)
-            total_pages = ceil(total / page_size)
-            start = (page - 1) * page_size
-            window = unique_quotes[start:start + page_size]
-
-            logger.info(f"Retrieved {total} unique quotes, returning {len(window)} for page {page}")
-            return {
-                "quotes": window,
-                "category": category,
-                "page": page,
-                "page_size": page_size,
-                "total": total,
-                "total_pages": total_pages,
-                "has_next": page < total_pages,
-                "has_previous": page > 1,
-            }
+        return await fetch_quotes(category=category, page=page, page_size=page_size)
     except Exception as e:
         logger.error(f"Error processing request: {str(e)}")
         raise HTTPException(status_code=500, detail="Internal server error")
+
+# ---------------------------------------------------------------------------
+# MCP server
+#
+# Exposes the same quote data as callable tools for LLM agents, mounted on this
+# app at /mcp so one deployment serves the site, the REST API and MCP. Tools
+# call fetch_quotes() in-process rather than issuing HTTP requests to ourselves.
+# ---------------------------------------------------------------------------
+
+mcp = MCPServer(
+    name="quotia",
+    title="Quotia",
+    instructions=(
+        "Quotia returns quotes collected from public quote sites. Use search_quotes "
+        "to page through results for a category, random_quote when you need a single "
+        "quote to display, and list_categories to discover valid category values "
+        "before filtering. Every quote carries a `source` field for attribution."
+    ),
+    website_url="https://quotia.vercel.app",
+)
+
+@mcp.tool()
+async def search_quotes(
+    category: Optional[str] = None,
+    page: int = 1,
+    page_size: int = DEFAULT_PAGE_SIZE,
+) -> QuotesResponse:
+    """Search quotes, optionally filtered by category.
+
+    Call this when the user asks for quotes on a theme, wants more quotes after a
+    previous batch, or needs several quotes to choose from.
+
+    Args:
+        category: Tag to filter by, such as love, inspirational or humor. Call
+            list_categories first if you are unsure a value is valid. Omit for a mix.
+        page: 1-based page number. Use has_next in the result to decide whether to
+            request another page.
+        page_size: Quotes per page, 1 to 100.
+
+    Returns a dict with `quotes` (each having text, author, source and tags) plus
+    `page`, `page_size`, `total`, `total_pages`, `has_next` and `has_previous`.
+    Results are collected live, so `total` counts what was retrieved for this
+    request rather than a fixed catalogue size.
+    """
+    page = max(1, page)
+    page_size = min(max(1, page_size), MAX_PAGE_SIZE)
+    return QuotesResponse(**await fetch_quotes(category=category, page=page, page_size=page_size))
+
+@mcp.tool()
+async def random_quote(category: Optional[str] = None) -> Quote:
+    """Return a single quote, optionally from a category.
+
+    Call this when the user wants one quote rather than a list — a quote of the
+    day, something to open a talk with, or a line to drop into a document.
+
+    Args:
+        category: Tag to filter by, such as love, inspirational or humor. Omit for
+            any category.
+
+    Returns one quote with text, author, source and tags. Errors if the category
+    matched nothing, in which case call list_categories for valid values.
+    """
+    result = await fetch_quotes(category=category, page=1, page_size=MAX_PAGE_SIZE)
+    quotes = result.get("quotes") or []
+    if not quotes:
+        raise ValueError(
+            f"No quotes found for category {category!r}. "
+            "Call list_categories for values known to return results."
+        )
+    return Quote(**random.choice(quotes))
+
+@mcp.tool()
+async def list_categories() -> CategoryList:
+    """List category values that are known to return results.
+
+    Call this before search_quotes or random_quote when the user names a theme and
+    you need to map it to a valid category, or when they ask what is available.
+    Categories are open-ended, so a value outside this list may still work — this
+    is the vetted set, not the complete one.
+    """
+    return CategoryList(categories=sorted(KNOWN_CATEGORIES))
+
+# Building the app registers the session manager, which the lifespan below runs.
+# streamable_http_path="/" keeps the endpoint at /mcp once mounted rather than
+# /mcp/mcp. stateless_http avoids per-client session state on a public server.
+mcp_app = mcp.streamable_http_app(
+    streamable_http_path="/",
+    stateless_http=True,
+    transport_security=TransportSecuritySettings(enable_dns_rebinding_protection=False),
+)
+
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    """Run the MCP session manager. A mounted sub-app's own lifespan never fires."""
+    async with mcp.session_manager.run():
+        yield
+
+app.router.lifespan_context = lifespan
+app.mount("/mcp", mcp_app)
 
 if __name__ == "__main__":
     import uvicorn

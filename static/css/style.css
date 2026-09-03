@@ -78,17 +78,18 @@ body {
    un-hide it: with JS off the class is never added, and if GSAP fails to load
    script.js strips the class, so text can never be left permanently clipped. */
 .reveal {
-    will-change: clip-path, transform;
+    will-change: opacity, transform;
 }
 
+/* Hide with opacity, never clip-path. A zero-area polygon() removes the element
+   from IntersectionObserver's intersection geometry, so a clipped element never
+   reports as visible and its own reveal trigger can never fire. */
 .js-anim .reveal {
-    clip-path: polygon(0 100%, 100% 100%, 100% 100%, 0 100%);
-    transform: translateY(10px);
+    opacity: 0;
 }
 
 .js-anim .reveal.visible {
-    clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%);
-    transform: translateY(0);
+    opacity: 1;
 }
 
 .js-anim .reveal-group > * {
@@ -96,13 +97,74 @@ body {
 }
 
 @media (prefers-reduced-motion: reduce) {
-    .js-anim .reveal {
-        clip-path: none;
-        transform: none;
-    }
-
+    .js-anim .reveal,
     .js-anim .reveal-group > * {
         opacity: 1;
+        transform: none;
+    }
+}
+
+/* ---------- Quote cards & category filter ---------- */
+
+.quote-select {
+    font-family: 'Space Mono', monospace;
+    font-size: 0.85rem;
+    color: var(--color-text);
+    background-color: transparent;
+    border: 1px solid rgba(5, 5, 5, 0.25);
+    padding: 0.5rem 2rem 0.5rem 0.75rem;
+    cursor: none;
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23050505' stroke-width='1.5' fill='none'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 0.7rem center;
+    background-size: 0.7rem;
+    transition: border-color 0.2s;
+}
+
+.quote-select:hover,
+.quote-select:focus {
+    border-color: var(--color-accent);
+    outline: none;
+}
+
+.quote-copy {
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 30px;
+    color: inherit;
+    background: none;
+    border: 1px solid currentColor;
+    opacity: 0.35;
+    cursor: none;
+    transition: opacity 0.2s, color 0.2s, border-color 0.2s;
+}
+
+.quote-card:hover .quote-copy {
+    opacity: 0.75;
+}
+
+.quote-copy:hover {
+    opacity: 1;
+}
+
+.quote-copy.copied {
+    color: var(--color-accent);
+    border-color: var(--color-accent);
+    opacity: 1;
+}
+
+@media (max-width: 768px) {
+    .quote-select,
+    .quote-copy {
+        cursor: pointer;
+    }
+
+    .quote-copy {
+        opacity: 0.75;
     }
 }
 

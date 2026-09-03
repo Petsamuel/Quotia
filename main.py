@@ -407,6 +407,14 @@ async def fetch(session: aiohttp.ClientSession, url: str) -> str:
         logger.error(f"Error fetching {url}: {str(e)}")
         return ""
 
+# Sources wrap quotes in their own punctuation — straight or curly, sometimes both.
+# Strip it so consumers can apply their own styling without doubling up.
+QUOTE_MARKS = ' \t\r\n"“”‘’\''
+
+def clean_quote_text(raw: str) -> str:
+    """Trim whitespace and any enclosing quotation marks from a scraped quote."""
+    return raw.strip().strip(QUOTE_MARKS).strip()
+
 async def scrape_quotes_toscrape(soup: BeautifulSoup) -> List[Dict[str, Any]]:
     """Scrape quotes from quotes.toscrape.com."""
     quotes = []
@@ -416,7 +424,7 @@ async def scrape_quotes_toscrape(soup: BeautifulSoup) -> List[Dict[str, Any]]:
             author = quote.find("small", class_="author")
             if text and author:
                 quotes.append({
-                    "text": text.text.strip(' "'),
+                    "text": clean_quote_text(text.text),
                     "author": author.text.strip(),
                     "source": "toscrape",
                     "tags": [tag.text.strip() for tag in quote.find_all("a", class_="tag") if tag.text.strip()]
@@ -449,8 +457,8 @@ async def scrape_quotes_goodreads(soup: BeautifulSoup) -> List[Dict[str, Any]]:
             author = quote.find("span", class_="authorOrTitle")
             if text_parts and author:
                 quotes.append({
-                    "text": text_parts[0].strip(' "'),
-                    "author": author.text.strip(),
+                    "text": clean_quote_text(text_parts[0]),
+                    "author": author.text.strip().rstrip(','),
                     "source": "goodreads",
                     "tags": _goodreads_tags(quote)
                 })

@@ -145,7 +145,27 @@
         </section>
 
         <section id="quotes-section" class="mb-24 md:mb-32">
-            <h2 class="text-3xl md:text-4xl font-serif font-bold mb-8 reveal">Live Quotes</h2>
+            <div class="flex flex-col md:flex-row md:items-end md:justify-between gap-6 mb-8">
+                <h2 class="text-3xl md:text-4xl font-serif font-bold reveal">Live Quotes</h2>
+                <div class="flex items-center gap-3 font-mono text-sm">
+                    <label for="category-select" class="opacity-60">Category</label>
+                    <select id="category-select" class="quote-select">
+                        <option value="">All</option>
+                        <option value="books">Books</option>
+                        <option value="friendship">Friendship</option>
+                        <option value="happiness">Happiness</option>
+                        <option value="humor">Humor</option>
+                        <option value="inspirational">Inspirational</option>
+                        <option value="life">Life</option>
+                        <option value="love">Love</option>
+                        <option value="poetry">Poetry</option>
+                        <option value="reading">Reading</option>
+                        <option value="success">Success</option>
+                        <option value="truth">Truth</option>
+                        <option value="wisdom">Wisdom</option>
+                    </select>
+                </div>
+            </div>
             <div id="quotes-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
                 <!-- Quotes will be injected here -->
             </div>
@@ -176,6 +196,10 @@
                     <span class="opacity-50 uppercase tracking-widest">More by the developer</span>
                     <a href="https://viblify.pages.dev/" target="_blank" rel="noopener noreferrer" class="hover:text-accent">Viblify &#8599;</a>
                     <a href="https://pikka.pages.dev/" target="_blank" rel="noopener noreferrer" class="hover:text-accent">Pikka &#8599;</a>
+                </nav>
+                <nav class="flex flex-col gap-3">
+                    <span class="opacity-50 uppercase tracking-widest">Contact</span>
+                    <a href="mailto:bieefilled@outlook.com" class="hover:text-accent">bieefilled@outlook.com</a>
                 </nav>
             </div>
             <div class="border-t border-ink border-opacity-10 pt-6">

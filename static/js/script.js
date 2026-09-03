@@ -37,8 +37,9 @@ async function loadQuotes() {
     if (!quotesContainer) return;
 
     try {
-        const response = await fetch('/v1/quote');
-        const quotes = await response.json();
+        const response = await fetch('/v1/quote?page_size=6');
+        const data = await response.json();
+        const quotes = data.quotes || [];
 
         quotesContainer.innerHTML = ''; // Clear existing quotes
 
@@ -46,7 +47,7 @@ async function loadQuotes() {
             const quoteEl = document.createElement('div');
             quoteEl.className = 'card p-6 md:p-8 border border-ink border-opacity-10 hover-invert';
             quoteEl.innerHTML = `
-                <p class="font-mono text-sm mb-4">"${quote.quote}"</p>
+                <p class="font-mono text-sm mb-4">"${quote.text}"</p>
                 <h3 class="text-lg font-serif font-bold">${quote.author}</h3>
             `;
             quotesContainer.appendChild(quoteEl);

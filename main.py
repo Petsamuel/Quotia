@@ -1,5 +1,6 @@
 from fastapi import FastAPI, Query, HTTPException
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, FileResponse, RedirectResponse
+from fastapi.staticfiles import StaticFiles
 from bs4 import BeautifulSoup
 import aiohttp
 import asyncio
@@ -10,8 +11,16 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 import logging
 from math import ceil
+from pathlib import Path
 from urllib.parse import quote as urlquote
 from typing import Any, Optional, Dict, List
+
+# Resolve assets relative to this file so the app works from any working directory.
+BASE_DIR = Path(__file__).resolve().parent
+INDEX_FILE = BASE_DIR / "index.html"
+STATIC_DIR = BASE_DIR / "static"
+
+QUOTES_ENDPOINT = "/v1/quote"
 
 # Enhanced logging configuration
 logging.basicConfig(
@@ -33,6 +42,8 @@ QUOTES_PER_SOURCE_PAGE = 10
 
 DESCRIPTION = """
 Quotia aggregates quotes scraped on demand from public quote sites.
+
+`GET /v1/quote` is the API. The site root `/` serves the landing page.
 
 ## Sources
 
@@ -153,6 +164,25 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+if STATIC_DIR.is_dir():
+    app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+else:
+    logger.warning(f"Static directory not found at {STATIC_DIR}; /static will 404")
+
+@app.get("/", include_in_schema=False)
+async def index() -> FileResponse:
+    """Serve the landing page. The quotes API lives at /v1/quote."""
+    if not INDEX_FILE.is_file():
+        logger.error(f"index.html not found at {INDEX_FILE}")
+        raise HTTPException(status_code=404, detail="index.html not found")
+    return FileResponse(INDEX_FILE, media_type="text/html")
+
+@app.get("/doc", include_in_schema=False)
+@app.get("/doc/", include_in_schema=False)
+async def doc_redirect() -> RedirectResponse:
+    """Alias /doc and /doc/ onto the ReDoc reference view."""
+    return RedirectResponse(url="/redoc", status_code=308)
+
 async def fetch(session: aiohttp.ClientSession, url: str) -> str:
     """Fetch the HTML content of a URL asynchronously."""
     try:
@@ -264,7 +294,7 @@ async def scrape_url(session: aiohttp.ClientSession, url: str) -> List[Dict[str,
         return []
 
 @app.get(
-    "/",
+    QUOTES_ENDPOINT,
     response_class=JSONResponse,
     response_model=QuotesResponse,
     tags=["quotes"],

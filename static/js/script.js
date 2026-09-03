@@ -3,6 +3,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initReveals();
     initCopyButtons();
     initCategoryFilter();
+    initShuffle();
     loadQuotes();
 });
 
@@ -292,10 +293,45 @@ function buildShareMenu(quote) {
     return menu;
 }
 
+// Pages seen so far, so shuffling pulls genuinely different quotes rather than
+// only reordering the six already on screen. Capped because deeper pages cost
+// another upstream request per source.
+const MAX_SHUFFLE_PAGE = 5;
+let availablePages = 1;
+
 function initCategoryFilter() {
     const select = document.getElementById('category-select');
     if (!select) return;
-    select.addEventListener('change', () => loadQuotes(select.value));
+    select.addEventListener('change', () => {
+        availablePages = 1; // page count is per-category
+        loadQuotes(select.value);
+    });
+}
+
+function initShuffle() {
+    const button = document.getElementById('shuffle-button');
+    if (!button) return;
+
+    button.addEventListener('click', async () => {
+        const select = document.getElementById('category-select');
+        button.disabled = true;
+        button.classList.add('is-loading');
+        try {
+            await loadQuotes(select ? select.value : '', { shuffle: true });
+        } finally {
+            button.disabled = false;
+            button.classList.remove('is-loading');
+        }
+    });
+}
+
+function shuffled(items) {
+    const copy = items.slice();
+    for (let i = copy.length - 1; i > 0; i -= 1) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [copy[i], copy[j]] = [copy[j], copy[i]];
+    }
+    return copy;
 }
 
 // Quotes come from third-party sites, so they are inserted as text nodes rather
@@ -374,19 +410,24 @@ async function copyQuote(button, quote) {
     }
 }
 
-async function loadQuotes(category = '') {
+async function loadQuotes(category = '', { shuffle = false } = {}) {
     const quotesContainer = document.getElementById('quotes-container');
     if (!quotesContainer) return;
 
     const params = new URLSearchParams({ page_size: '6' });
     if (category) params.set('category', category);
+    if (shuffle) {
+        const depth = Math.max(1, Math.min(availablePages, MAX_SHUFFLE_PAGE));
+        params.set('page', String(1 + Math.floor(Math.random() * depth)));
+    }
 
     quotesContainer.setAttribute('aria-busy', 'true');
 
     try {
         const response = await fetch(`/v1/quote?${params}`);
         const data = await response.json();
-        const quotes = data.quotes || [];
+        availablePages = data.total_pages || 1;
+        const quotes = shuffle ? shuffled(data.quotes || []) : (data.quotes || []);
 
         quotesContainer.innerHTML = ''; // Clear existing quotes
 

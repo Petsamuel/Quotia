@@ -128,6 +128,51 @@ body {
     outline: none;
 }
 
+.quote-shuffle {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-family: 'Space Mono', monospace;
+    font-size: 0.85rem;
+    color: var(--color-text);
+    background: none;
+    border: 1px solid rgba(5, 5, 5, 0.25);
+    padding: 0.5rem 0.9rem;
+    cursor: none;
+    transition: border-color 0.2s, color 0.2s, opacity 0.2s;
+}
+
+.quote-shuffle:hover:not(:disabled),
+.quote-shuffle:focus-visible:not(:disabled) {
+    border-color: var(--color-accent);
+    color: var(--color-accent);
+    outline: none;
+}
+
+.quote-shuffle:disabled {
+    opacity: 0.45;
+}
+
+.quote-shuffle__icon {
+    width: 14px;
+    height: 14px;
+    flex-shrink: 0;
+}
+
+.quote-shuffle.is-loading .quote-shuffle__icon {
+    animation: quote-spin 0.7s linear infinite;
+}
+
+@keyframes quote-spin {
+    to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .quote-shuffle.is-loading .quote-shuffle__icon {
+        animation: none;
+    }
+}
+
 .quote-card {
     display: flex;
     flex-direction: column;
@@ -240,6 +285,7 @@ body {
 
 @media (max-width: 768px) {
     .quote-select,
+    .quote-shuffle,
     .quote-copy,
     .quote-share,
     .share-menu button {

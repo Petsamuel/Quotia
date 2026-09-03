@@ -4,6 +4,14 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
+    <!-- Google Tag Manager -->
+    <script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
+    new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
+    j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
+    'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
+    })(window,document,'script','dataLayer','GTM-MP9QV672');</script>
+    <!-- End Google Tag Manager -->
+
     <title>Quotia — Quotes API</title>
     <meta name="description" content="Quotia is a developer-friendly quote API. Filter quotes by category, page through results, and get clean, predictable JSON back — one endpoint, no API key required.">
     <meta name="author" content="Quotia">
@@ -76,6 +84,11 @@
     </script>
 </head>
 <body class="bg-stone-100 text-ink">
+
+    <!-- Google Tag Manager (noscript) -->
+    <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-MP9QV672"
+    height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
+    <!-- End Google Tag Manager (noscript) -->
 
     <div id="cursor" class="cursor"></div>
 
@@ -164,6 +177,10 @@
                         <option value="truth">Truth</option>
                         <option value="wisdom">Wisdom</option>
                     </select>
+                    <button type="button" id="shuffle-button" class="quote-shuffle" aria-label="Shuffle quotes">
+                        <svg class="quote-shuffle__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 3h5v5"/><path d="M4 20 21 3"/><path d="M21 16v5h-5"/><path d="m15 15 6 6"/><path d="m4 4 5 5"/></svg>
+                        <span>Shuffle</span>
+                    </button>
                 </div>
             </div>
             <div id="quotes-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">

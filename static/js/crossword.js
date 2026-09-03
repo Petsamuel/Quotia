@@ -2,6 +2,8 @@
 
 const BLOCK = '#';
 
+const STORAGE_KEY = 'quotia.crossword.v1';
+
 const state = {
     puzzle: null,
     size: 0,
@@ -10,10 +12,69 @@ const state = {
     downAt: new Map(),        // "r,c" -> down entry containing this cell
     direction: 'across',
     cursor: null,             // "r,c"
+    revealed: false,
 };
 
 const key = (r, c) => `${r},${c}`;
 const el = id => document.getElementById(id);
+
+/* ---- Progress persistence -------------------------------------------------
+   Saving letters alone would be pointless: without the puzzle identity a
+   refresh generates a different grid and the letters would land on the wrong
+   squares. So the identity is stored alongside them and letters are only
+   restored when it matches exactly. localStorage is wrapped throughout because
+   it throws in private mode and when the quota is full. */
+
+function puzzleId(p) {
+    if (!p) return '';
+    const scope = p.date ? `daily:${p.date}` : `seed:${p.seed}`;
+    return `${scope}|${p.size}|${p.category || 'mixed'}`;
+}
+
+function readSaved() {
+    try {
+        return JSON.parse(window.localStorage.getItem(STORAGE_KEY) || 'null');
+    } catch (error) {
+        return null;
+    }
+}
+
+function saveProgress() {
+    if (!state.puzzle) return;
+    const letters = {};
+    state.inputs.forEach((input, k) => {
+        if (input.value) letters[k] = input.value;
+    });
+    try {
+        window.localStorage.setItem(STORAGE_KEY, JSON.stringify({
+            id: puzzleId(state.puzzle),
+            seed: state.puzzle.seed,
+            size: state.puzzle.size,
+            category: state.puzzle.category || '',
+            daily: Boolean(state.puzzle.date),
+            revealed: state.revealed,
+            letters,
+        }));
+    } catch (error) {
+        /* Storage unavailable or full — solving still works, it just won't persist. */
+    }
+}
+
+function restoreProgress() {
+    const saved = readSaved();
+    if (!saved || saved.id !== puzzleId(state.puzzle)) return 0;
+
+    let restored = 0;
+    Object.entries(saved.letters || {}).forEach(([k, letter]) => {
+        const input = state.inputs.get(k);
+        if (!input) return;
+        input.value = letter;
+        if (saved.revealed) input.parentElement.classList.add('is-revealed');
+        restored += 1;
+    });
+    state.revealed = Boolean(saved.revealed);
+    return restored;
+}
 
 function entryCells(entry) {
     const cells = [];
@@ -178,6 +239,7 @@ function onInput(event) {
     const value = input.value.replace(/[^a-zA-Z]/g, '').toUpperCase();
     input.value = value.slice(-1);
     input.parentElement.classList.remove('is-wrong');
+    saveProgress();
     if (input.value) {
         step(1);
         checkComplete();
@@ -223,6 +285,7 @@ function onKeyDown(event) {
         input.parentElement.classList.remove('is-wrong');
         if (input.value) input.value = '';
         else step(-1);
+        saveProgress();
     }
 }
 
@@ -251,6 +314,8 @@ function revealAll() {
         input.parentElement.classList.remove('is-wrong');
         input.parentElement.classList.add('is-revealed');
     });
+    state.revealed = true;
+    saveProgress();
     setStatus('Solution revealed.');
 }
 
@@ -259,6 +324,8 @@ function clearGrid() {
         input.value = '';
         input.parentElement.classList.remove('is-wrong', 'is-revealed');
     });
+    state.revealed = false;
+    saveProgress();
     setStatus('');
 }
 
@@ -299,9 +366,18 @@ async function loadPuzzle({ category, size, seed, daily = false } = {}) {
         state.size = data.size;
         state.direction = 'across';
         state.cursor = null;
+        state.revealed = false;
 
         buildGrid();
         buildClueLists();
+
+        const restored = restoreProgress();
+        if (restored) {
+            setStatus(`Picked up where you left off — ${restored} letter${restored === 1 ? '' : 's'} restored.`);
+        } else {
+            // Record the new puzzle's identity so the next refresh returns it.
+            saveProgress();
+        }
 
         const first = data.across[0] || data.down[0];
         if (first) {
@@ -348,12 +424,30 @@ document.addEventListener('DOMContentLoaded', () => {
     el('cw-prev').addEventListener('click', () => moveEntry(-1));
     el('cw-next').addEventListener('click', () => moveEntry(1));
 
-    // A seed in the URL makes a puzzle shareable: /crossword?seed=4242
+    // Precedence: an explicit URL seed (a shared puzzle) beats saved progress,
+    // which beats a fresh random puzzle.
     const url = new URLSearchParams(window.location.search);
-    const seed = url.get('seed');
-    const category = url.get('category');
-    if (category) el('cw-category').value = category;
-    loadPuzzle({ ...currentOptions(), seed });
+    const urlSeed = url.get('seed');
+    const urlCategory = url.get('category');
+
+    if (urlSeed) {
+        if (urlCategory) el('cw-category').value = urlCategory;
+        loadPuzzle({ ...currentOptions(), seed: urlSeed });
+        return;
+    }
+
+    const saved = readSaved();
+    if (saved && saved.size) {
+        // Reload the exact puzzle they were solving, not a new random one.
+        el('cw-size').value = String(saved.size);
+        el('cw-category').value = saved.category || '';
+        loadPuzzle(saved.daily
+            ? { size: saved.size, daily: true }
+            : { category: saved.category || '', size: saved.size, seed: saved.seed });
+        return;
+    }
+
+    loadPuzzle(currentOptions());
 });
 
 function moveEntry(delta) {

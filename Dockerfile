@@ -14,4 +14,9 @@ COPY --chown=user ./requirements.txt requirements.txt
 RUN pip install --no-cache-dir --upgrade -r requirements.txt
 
 COPY --chown=user . /app
+
+# Compile the crossword word bank into SQLite at build time so the first request
+# doesn't pay for it. The database is generated, never committed, never served.
+RUN python build_wordbank.py
+
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "7860"]

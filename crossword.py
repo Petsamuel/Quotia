@@ -4,14 +4,20 @@ Builds criss-cross puzzles: words interlock on an open grid, each new word
 crossing a letter of one already placed. Unlike a dense American-style grid this
 always yields a valid, solvable puzzle rather than failing to fill.
 
-The word bank ships with the repo (data/crossword_words.json) with clues written
-for this project, so generation needs no network call and no third-party rights.
+Words come from a local SQLite database (data/wordbank.db), compiled from
+data/crossword_words.json by build_wordbank.py. Clues are written for this
+project, so generation needs no network call and no third-party rights.
+
+The database is server-side only: it lives outside the mounted static directory
+and no route exposes it.
 """
 
 import hashlib
-import json
 import logging
 import random
+import sqlite3
+import subprocess
+import sys
 from datetime import date, datetime, timezone
 from functools import lru_cache
 from pathlib import Path
@@ -19,7 +25,9 @@ from typing import Any, Dict, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
-WORDS_FILE = Path(__file__).resolve().parent / "data" / "crossword_words.json"
+BASE_DIR = Path(__file__).resolve().parent
+SEED_FILE = BASE_DIR / "data" / "crossword_words.json"
+DB_FILE = BASE_DIR / "data" / "wordbank.db"
 
 BLOCK = "#"
 
@@ -35,27 +43,70 @@ MAX_WORDS = 40
 PLACEMENT_ATTEMPTS = 60
 
 
+def ensure_database() -> None:
+    """Build the word bank if it is missing or older than its seed file.
+
+    Keeps local development a one-step affair: the database is a generated
+    artifact, so there is nothing to commit and nothing to remember.
+    """
+    if DB_FILE.is_file() and DB_FILE.stat().st_mtime >= SEED_FILE.stat().st_mtime:
+        return
+
+    logger.info("Building crossword word bank at %s", DB_FILE)
+    import build_wordbank
+
+    build_wordbank.build(build_wordbank.load_seed(), DB_FILE)
+
+
+def connect() -> sqlite3.Connection:
+    """Open the word bank read-only. Nothing in the request path writes to it."""
+    ensure_database()
+    connection = sqlite3.connect(f"file:{DB_FILE.as_posix()}?mode=ro", uri=True)
+    connection.row_factory = sqlite3.Row
+    return connection
+
+
 @lru_cache(maxsize=1)
-def load_word_bank() -> Dict[str, List[Dict[str, str]]]:
-    """Read the bundled word bank once, uppercasing every answer."""
-    with WORDS_FILE.open(encoding="utf-8") as handle:
-        raw = json.load(handle)
-
-    bank: Dict[str, List[Dict[str, str]]] = {}
-    for category, entries in raw.items():
-        cleaned = []
-        for entry in entries:
-            word = str(entry["word"]).strip().upper()
-            if word.isalpha() and len(word) >= 2:
-                cleaned.append({"word": word, "clue": str(entry["clue"]).strip()})
-        if cleaned:
-            bank[category] = cleaned
-    return bank
-
-
 def available_categories() -> List[str]:
-    """Category names that have a usable word list."""
-    return sorted(load_word_bank())
+    """Category names present in the word bank."""
+    with connect() as connection:
+        rows = connection.execute("SELECT name FROM categories ORDER BY name").fetchall()
+    return [row["name"] for row in rows]
+
+
+@lru_cache(maxsize=64)
+def words_for(category: Optional[str] = None, max_length: Optional[int] = None):
+    """Words for a category (or all), optionally capped to a maximum length.
+
+    Filtering by length in SQL rather than in Python means the generator only
+    ever loads words that can physically fit the grid, using the length index.
+    Results are cached because the bank is read-only at runtime.
+    """
+    sql = [
+        "SELECT DISTINCT w.word AS word, w.clue AS clue",
+        "FROM words w",
+    ]
+    params: List[Any] = []
+
+    if category:
+        sql += [
+            "JOIN word_categories wc ON wc.word_id = w.id",
+            "JOIN categories c ON c.id = wc.category_id",
+            "WHERE c.name = ?",
+        ]
+        params.append(category)
+        if max_length is not None:
+            sql.append("AND w.length <= ?")
+            params.append(max_length)
+    elif max_length is not None:
+        sql.append("WHERE w.length <= ?")
+        params.append(max_length)
+
+    sql.append("ORDER BY w.length DESC, w.word")
+
+    with connect() as connection:
+        rows = connection.execute(" ".join(sql), params).fetchall()
+    return tuple({"word": row["word"], "clue": row["clue"]} for row in rows)
 
 
 def _fits(grid, word, row, col, dr, dc, size) -> bool:
@@ -239,11 +290,11 @@ def generate_puzzle(
     Returns the solution grid, a blank grid to solve, numbered across/down clues,
     and the seed used — pass the same seed back to reproduce the puzzle exactly.
     """
-    bank = load_word_bank()
+    categories = available_categories()
     category = (category or "").strip().lower() or None
-    if category and category not in bank:
+    if category and category not in categories:
         raise ValueError(
-            f"Unknown category {category!r}. Available: {', '.join(sorted(bank))}."
+            f"Unknown category {category!r}. Available: {', '.join(categories)}."
         )
 
     size = max(MIN_SIZE, min(size, MAX_SIZE))
@@ -251,7 +302,10 @@ def generate_puzzle(
         word_count = max(MIN_WORDS, min(size, MAX_WORDS))
     word_count = max(MIN_WORDS, min(word_count, MAX_WORDS))
 
-    words = list(bank[category]) if category else [w for ws in bank.values() for w in ws]
+    # Ask the database only for words that can fit this grid.
+    words = [dict(w) for w in words_for(category, size)]
+    if not words:
+        raise ValueError("No words available for that category and size.")
     clues = {w["word"]: w["clue"] for w in words}
 
     if seed is None:

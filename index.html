@@ -3,12 +3,76 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Quotia - Asynchronous Quote-Scraping API</title>
+
+    <title>Quotia — Quotes API</title>
+    <meta name="description" content="Quotia is a free, developer-focused REST API that scrapes quotes from multiple public sources in parallel and returns clean, paginated JSON. Filter by category, page through results, no API key required.">
+    <meta name="author" content="Quotia">
+    <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1">
+    <link rel="canonical" href="__BASE_URL__/">
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="Quotia">
+    <meta property="og:title" content="Quotia — Quotes API">
+    <meta property="og:description" content="A free REST API that scrapes quotes from multiple public sources in parallel and returns clean, paginated JSON. Filter by category, no API key required.">
+    <meta property="og:url" content="__BASE_URL__/">
+    <meta property="og:image" content="__BASE_URL__/static/assets/og-image.png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:image:alt" content="Quotia — Quotes API">
+    <meta property="og:locale" content="en_US">
+
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Quotia — Quotes API">
+    <meta name="twitter:description" content="A free REST API that scrapes quotes from multiple public sources in parallel and returns clean, paginated JSON. Filter by category, no API key required.">
+    <meta name="twitter:image" content="__BASE_URL__/static/assets/og-image.png">
+    <meta name="twitter:image:alt" content="Quotia — Quotes API">
+
+    <meta name="theme-color" content="#F2F0EA">
+    <link rel="icon" href="/static/assets/logo.svg" type="image/svg+xml">
+    <link rel="alternate" type="text/plain" href="__BASE_URL__/llms.txt" title="llms.txt">
+
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=Space+Mono&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="static/css/style.css">
+
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@graph": [
+        {
+          "@type": "WebSite",
+          "@id": "__BASE_URL__/#website",
+          "url": "__BASE_URL__/",
+          "name": "Quotia",
+          "description": "A free REST API that scrapes quotes from multiple public sources in parallel and returns clean, paginated JSON.",
+          "inLanguage": "en"
+        },
+        {
+          "@type": "WebAPI",
+          "@id": "__BASE_URL__/#api",
+          "name": "Quotia Quote API",
+          "description": "Scrapes quotes from quotes.toscrape.com and goodreads.com in parallel, deduplicates them, and returns paginated JSON filtered by category.",
+          "url": "__BASE_URL__/v1/quote",
+          "documentation": "__BASE_URL__/redoc",
+          "provider": { "@id": "__BASE_URL__/#website" },
+          "termsOfService": "__BASE_URL__/",
+          "isAccessibleForFree": true
+        },
+        {
+          "@type": "SoftwareApplication",
+          "name": "Quotia",
+          "applicationCategory": "DeveloperApplication",
+          "operatingSystem": "Any",
+          "url": "__BASE_URL__/",
+          "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" }
+        }
+      ]
+    }
+    </script>
 </head>
 <body class="bg-stone-100 text-ink">
 

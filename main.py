@@ -1,5 +1,11 @@
-from fastapi import FastAPI, Query, HTTPException
-from fastapi.responses import JSONResponse, FileResponse, RedirectResponse
+from fastapi import FastAPI, Query, HTTPException, Request
+from fastapi.responses import (
+    JSONResponse,
+    RedirectResponse,
+    HTMLResponse,
+    PlainTextResponse,
+    Response,
+)
 from fastapi.staticfiles import StaticFiles
 from bs4 import BeautifulSoup
 import aiohttp
@@ -10,9 +16,12 @@ from fastapi_cache.decorator import cache
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 import logging
+import os
+from functools import lru_cache
 from math import ceil
 from pathlib import Path
 from urllib.parse import quote as urlquote
+from xml.sax.saxutils import escape as xml_escape
 from typing import Any, Optional, Dict, List
 
 # Resolve assets relative to this file so the app works from any working directory.
@@ -21,6 +30,13 @@ INDEX_FILE = BASE_DIR / "index.html"
 STATIC_DIR = BASE_DIR / "static"
 
 QUOTES_ENDPOINT = "/v1/quote"
+
+# Absolute URLs in canonical tags, Open Graph, sitemap.xml and llms.txt must point
+# at the real public origin. Set QUOTIA_BASE_URL in production (e.g. behind a proxy
+# or custom domain); otherwise we fall back to the origin the request arrived on,
+# which is correct for local dev and default Hugging Face Space URLs.
+BASE_URL_ENV_VAR = "QUOTIA_BASE_URL"
+BASE_URL_PLACEHOLDER = "__BASE_URL__"
 
 # Enhanced logging configuration
 logging.basicConfig(
@@ -169,19 +185,188 @@ if STATIC_DIR.is_dir():
 else:
     logger.warning(f"Static directory not found at {STATIC_DIR}; /static will 404")
 
+def resolve_base_url(request: Request) -> str:
+    """Public origin for absolute URLs, without a trailing slash."""
+    configured = os.getenv(BASE_URL_ENV_VAR, "").strip()
+    if configured:
+        return configured.rstrip("/")
+    return str(request.base_url).rstrip("/")
+
+@lru_cache(maxsize=8)
+def render_index(base_url: str) -> str:
+    """Read index.html and bake the public origin into its canonical/OG/JSON-LD tags."""
+    return INDEX_FILE.read_text(encoding="utf-8").replace(BASE_URL_PLACEHOLDER, base_url)
+
 @app.get("/", include_in_schema=False)
-async def index() -> FileResponse:
+async def index(request: Request) -> HTMLResponse:
     """Serve the landing page. The quotes API lives at /v1/quote."""
     if not INDEX_FILE.is_file():
         logger.error(f"index.html not found at {INDEX_FILE}")
         raise HTTPException(status_code=404, detail="index.html not found")
-    return FileResponse(INDEX_FILE, media_type="text/html")
+    return HTMLResponse(render_index(resolve_base_url(request)))
 
 @app.get("/doc", include_in_schema=False)
 @app.get("/doc/", include_in_schema=False)
 async def doc_redirect() -> RedirectResponse:
     """Alias /doc and /doc/ onto the ReDoc reference view."""
     return RedirectResponse(url="/redoc", status_code=308)
+
+@app.get("/robots.txt", include_in_schema=False)
+async def robots_txt(request: Request) -> PlainTextResponse:
+    """Let crawlers index the site and docs, but keep them out of the scraping endpoint."""
+    base_url = resolve_base_url(request)
+    body = f"""User-agent: *
+Allow: /
+Disallow: {QUOTES_ENDPOINT}
+
+Sitemap: {base_url}/sitemap.xml
+"""
+    return PlainTextResponse(body)
+
+@app.get("/sitemap.xml", include_in_schema=False)
+async def sitemap_xml(request: Request) -> Response:
+    """List the human-readable pages worth indexing."""
+    base_url = resolve_base_url(request)
+    pages = [("/", "1.0"), ("/docs", "0.8"), ("/redoc", "0.8")]
+    entries = "\n".join(
+        f"  <url>\n"
+        f"    <loc>{xml_escape(base_url + path)}</loc>\n"
+        f"    <changefreq>weekly</changefreq>\n"
+        f"    <priority>{priority}</priority>\n"
+        f"  </url>"
+        for path, priority in pages
+    )
+    body = (
+        '<?xml version="1.0" encoding="UTF-8"?>\n'
+        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
+        f"{entries}\n"
+        "</urlset>\n"
+    )
+    return Response(content=body, media_type="application/xml")
+
+@app.get("/llms.txt", include_in_schema=False)
+async def llms_txt(request: Request) -> PlainTextResponse:
+    """Concise index for LLM agents, per the llmstxt.org convention."""
+    base_url = resolve_base_url(request)
+    body = f"""# Quotia
+
+> A free, developer-focused REST API that scrapes quotes from multiple public
+> sources in parallel, deduplicates them, and returns clean paginated JSON.
+
+Quotia exposes one endpoint and requires no authentication or API key. Quotes are
+scraped live from public sites and cached in memory for 5 minutes. Because results
+are scraped per request, `total` reflects what was retrieved for that request
+rather than a fixed catalogue size.
+
+## API
+
+- [GET {QUOTES_ENDPOINT}]({base_url}{QUOTES_ENDPOINT}): Returns a page of quotes. Query
+  parameters: `category` (tag such as love, inspirational, humor), `page`
+  (1-based, default 1), `page_size` (1-{MAX_PAGE_SIZE}, default {DEFAULT_PAGE_SIZE}). Responds with
+  `quotes`, `category`, `page`, `page_size`, `total`, `total_pages`, `has_next`,
+  `has_previous`. Each quote has `text`, `author`, `source`, `tags`.
+
+## Docs
+
+- [OpenAPI schema]({base_url}/openapi.json): Machine-readable specification of the API.
+- [ReDoc reference]({base_url}/redoc): Reference-style documentation.
+- [Swagger UI]({base_url}/docs): Interactive documentation you can send requests from.
+- [Full details]({base_url}/llms-full.txt): Parameters, response schema and examples in one file.
+
+## Sources
+
+- [quotes.toscrape.com](http://quotes.toscrape.com): Reported as `source: "toscrape"`.
+- [goodreads.com/quotes](https://www.goodreads.com/quotes): Reported as `source: "goodreads"`.
+"""
+    return PlainTextResponse(body)
+
+@app.get("/llms-full.txt", include_in_schema=False)
+async def llms_full_txt(request: Request) -> PlainTextResponse:
+    """Everything an agent needs to call the API correctly, without fetching the schema."""
+    base_url = resolve_base_url(request)
+    example = """```json
+{
+  "quotes": [
+    {
+      "text": "The world as we have created it is a process of our thinking.",
+      "author": "Albert Einstein",
+      "source": "toscrape",
+      "tags": ["change", "deep-thoughts", "thinking", "world"]
+    }
+  ],
+  "category": "inspirational",
+  "page": 1,
+  "page_size": 10,
+  "total": 40,
+  "total_pages": 4,
+  "has_next": true,
+  "has_previous": false
+}
+```"""
+    body = f"""# Quotia — full reference
+
+> A free, developer-focused REST API that scrapes quotes from multiple public
+> sources in parallel, deduplicates them, and returns clean paginated JSON.
+
+Base URL: {base_url}
+No authentication is required.
+
+## GET {QUOTES_ENDPOINT}
+
+Scrapes every configured source concurrently, merges the results, removes
+duplicates, and returns one page. A source that fails or returns a non-200 status
+is skipped rather than failing the request.
+
+### Query parameters
+
+- `category` (string, optional): Tag to filter by, e.g. `love`, `inspirational`,
+  `humor`. Case-insensitive and trimmed. Omit for the front page of each source.
+- `page` (integer, optional, default 1, minimum 1): 1-based page number. A page
+  beyond the available results returns an empty `quotes` list, not an error.
+- `page_size` (integer, optional, default {DEFAULT_PAGE_SIZE}, range 1-{MAX_PAGE_SIZE}): Quotes per page.
+
+### Response fields
+
+- `quotes` (array): The requested page. Each item has `text` (string),
+  `author` (string), `source` (`"toscrape"` or `"goodreads"`), and `tags`
+  (array of strings, may be empty when the source lists none).
+- `category` (string or null): The normalized category that was applied.
+- `page`, `page_size` (integer): Echo of the pagination request.
+- `total` (integer): Unique quotes retrieved for this request. Scraping is live and
+  bounded to {MAX_SOURCE_PAGES} pages per source, so this is not a fixed catalogue size and can
+  differ between requests with different `page_size` values.
+- `total_pages` (integer): `total` divided by `page_size`, rounded up.
+- `has_next`, `has_previous` (boolean): Whether adjacent pages exist.
+
+### Example
+
+Request: `GET {base_url}{QUOTES_ENDPOINT}?category=inspirational&page=1&page_size=10`
+
+{example}
+
+### Errors
+
+- `422 Unprocessable Entity`: A parameter failed validation, e.g. `page=0` or
+  `page_size` above {MAX_PAGE_SIZE}. The body has FastAPI's standard `detail` array.
+- `500 Internal Server Error`: Scraping failed unexpectedly. The body is
+  `{{"detail": "Internal server error"}}`.
+
+## Behaviour notes
+
+- Responses are cached in memory for 5 minutes per `category`/`page`/`page_size`.
+- Page 1 of every source is fetched before page 2 of any source, so lower `page`
+  values hold the most prominent quotes.
+- Quotes appearing on both sources are returned once, keeping the first occurrence.
+- Quotes are scraped from third-party sites; check their terms before redistributing.
+
+## Other endpoints
+
+- `GET /` — landing page.
+- `GET /docs` — Swagger UI.
+- `GET /redoc` — ReDoc reference. `/doc` and `/doc/` redirect here.
+- `GET /openapi.json` — OpenAPI schema.
+"""
+    return PlainTextResponse(body)
 
 async def fetch(session: aiohttp.ClientSession, url: str) -> str:
     """Fetch the HTML content of a URL asynchronously."""

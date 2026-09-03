@@ -104,6 +104,47 @@ body {
     }
 }
 
+/* ---------- Footer watermark ---------- */
+
+/* The wordmark is pushed half past the footer's bottom edge and clipped by
+   overflow:hidden, so only its top half is ever visible. */
+.footer {
+    position: relative;
+    overflow: hidden;
+}
+
+.footer__watermark {
+    position: absolute;
+    left: 50%;
+    bottom: 0;
+    transform: translate(-50%, 50%);
+    display: flex;
+    align-items: center;
+    gap: 0.12em;
+    font-family: 'Playfair Display', serif;
+    font-weight: 700;
+    font-size: clamp(4.5rem, 18vw, 15rem);
+    line-height: 0.8;
+    letter-spacing: -0.02em;
+    color: var(--color-text);
+    opacity: 0.07;
+    white-space: nowrap;
+    pointer-events: none;
+    user-select: none;
+    z-index: 0;
+}
+
+.footer__watermark img {
+    height: 0.62em;
+    width: auto;
+}
+
+/* Keeps the real footer links above the watermark and clickable. */
+.footer__content {
+    position: relative;
+    z-index: 1;
+}
+
 /* ---------- Legal pages ---------- */
 
 .legal h2 {

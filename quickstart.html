@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Quickstart — Quotia</title>
+    <meta name="description" content="Make your first Quotia request in under a minute. Copy-paste curl, JavaScript and Python examples, every query parameter, and the exact JSON response shape.">
+    <meta name="author" content="Quotia">
+    <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1">
+    <link rel="canonical" href="__BASE_URL__/quickstart">
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="article">
+    <meta property="og:site_name" content="Quotia">
+    <meta property="og:title" content="Quickstart — Quotia">
+    <meta property="og:description" content="Make your first Quotia request in under a minute. Copy-paste curl, JavaScript and Python examples, every query parameter, and the exact JSON response shape.">
+    <meta property="og:url" content="__BASE_URL__/quickstart">
+    <meta property="og:image" content="__BASE_URL__/static/assets/og-image.png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:image:alt" content="Quotia — the quote API for developers">
+    <meta property="og:locale" content="en_US">
+
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Quickstart — Quotia">
+    <meta name="twitter:description" content="Make your first Quotia request in under a minute. Copy-paste curl, JavaScript and Python examples, every query parameter, and the exact JSON response shape.">
+    <meta name="twitter:image" content="__BASE_URL__/static/assets/og-image.png">
+    <meta name="twitter:image:alt" content="Quotia — the quote API for developers">
+
+    <meta name="theme-color" content="#F2F0EA">
+    <link rel="icon" href="/static/assets/logo.svg" type="image/svg+xml">
+    <link rel="alternate" type="text/plain" href="__BASE_URL__/llms.txt" title="llms.txt">
+
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=Space+Mono&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/css/style.css">
+
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "TechArticle",
+      "headline": "Quotia Quickstart",
+      "description": "Make your first Quotia request in under a minute, with examples in curl, JavaScript and Python.",
+      "url": "__BASE_URL__/quickstart",
+      "inLanguage": "en",
+      "isPartOf": { "@type": "WebSite", "@id": "__BASE_URL__/#website" }
+    }
+    </script>
+</head>
+<body class="bg-stone-100 text-ink">
+
+    <div id="cursor" class="cursor"></div>
+
+    <header class="fixed top-0 left-0 right-0 p-4 md:p-8 flex justify-between items-center z-50">
+        <a href="/" class="logo">
+            <img src="/static/assets/logo.svg" alt="Quotia" class="h-6 md:h-8">
+        </a>
+        <nav class="flex gap-4 md:gap-8 font-mono text-xs md:text-sm">
+            <a href="/quickstart" class="text-accent">Quickstart</a>
+            <a href="/pricing" class="hover:text-accent">Pricing</a>
+            <a href="/docs" class="hover:text-accent">Docs</a>
+        </nav>
+    </header>
+
+    <main class="container mx-auto px-4 md:px-8 py-24 md:py-32">
+
+        <section class="mb-16 md:mb-24">
+            <h1 class="text-5xl md:text-7xl font-serif font-bold leading-none mb-8 reveal">
+                Quickstart
+            </h1>
+            <p class="text-base md:text-lg font-mono max-w-2xl reveal">
+                One endpoint, no signup, no API key. Send a request and you get quotes back as JSON.
+            </p>
+        </section>
+
+        <section class="mb-16 md:mb-24">
+            <h2 class="text-2xl md:text-3xl font-serif font-bold mb-6 reveal">Base URL</h2>
+            <div class="bg-white p-6 border border-ink border-opacity-10 overflow-x-auto">
+                <pre class="font-mono text-sm"><code>https://api.quotia.io/v1/quote</code></pre>
+            </div>
+        </section>
+
+        <section class="mb-16 md:mb-24">
+            <h2 class="text-2xl md:text-3xl font-serif font-bold mb-6 reveal">Your first request</h2>
+            <div class="bg-white p-6 md:p-8 border border-ink border-opacity-10 overflow-x-auto mb-8">
+                <h3 class="text-base font-mono font-bold mb-4">curl</h3>
+                <pre class="font-mono text-sm"><code class="language-bash">curl "https://api.quotia.io/v1/quote?category=inspirational&amp;page_size=10"</code></pre>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div class="bg-white p-6 md:p-8 border border-ink border-opacity-10 overflow-x-auto">
+                    <h3 class="text-base font-mono font-bold mb-4">JavaScript</h3>
+                    <pre class="font-mono text-sm"><code class="language-js">const res = await fetch(
+  'https://api.quotia.io/v1/quote?category=love'
+);
+const data = await res.json();
+
+console.log(data.quotes);</code></pre>
+                </div>
+                <div class="bg-white p-6 md:p-8 border border-ink border-opacity-10 overflow-x-auto">
+                    <h3 class="text-base font-mono font-bold mb-4">Python</h3>
+                    <pre class="font-mono text-sm"><code class="language-python">import requests
+
+res = requests.get(
+    'https://api.quotia.io/v1/quote',
+    params={'category': 'love'},
+)
+print(res.json()['quotes'])</code></pre>
+                </div>
+            </div>
+        </section>
+
+        <section class="mb-16 md:mb-24">
+            <h2 class="text-2xl md:text-3xl font-serif font-bold mb-6 reveal">Query parameters</h2>
+            <div class="overflow-x-auto border border-ink border-opacity-10 bg-white">
+                <table class="w-full font-mono text-sm">
+                    <thead>
+                        <tr class="border-b border-ink border-opacity-10 text-left">
+                            <th class="p-4 font-bold">Parameter</th>
+                            <th class="p-4 font-bold">Type</th>
+                            <th class="p-4 font-bold">Default</th>
+                            <th class="p-4 font-bold">Description</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr class="border-b border-ink border-opacity-10">
+                            <td class="p-4 text-accent">category</td>
+                            <td class="p-4">string</td>
+                            <td class="p-4">—</td>
+                            <td class="p-4">Filter by tag, e.g. <code>love</code>, <code>inspirational</code>, <code>humor</code>. Omit for a mix.</td>
+                        </tr>
+                        <tr class="border-b border-ink border-opacity-10">
+                            <td class="p-4 text-accent">page</td>
+                            <td class="p-4">integer</td>
+                            <td class="p-4">1</td>
+                            <td class="p-4">1-based page number. Minimum 1.</td>
+                        </tr>
+                        <tr>
+                            <td class="p-4 text-accent">page_size</td>
+                            <td class="p-4">integer</td>
+                            <td class="p-4">10</td>
+                            <td class="p-4">Quotes per page, from 1 to 100.</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <section class="mb-16 md:mb-24">
+            <h2 class="text-2xl md:text-3xl font-serif font-bold mb-6 reveal">Response</h2>
+            <div class="bg-white p-6 md:p-8 border border-ink border-opacity-10 overflow-x-auto">
+                <pre class="font-mono text-sm"><code class="language-json">{
+  "quotes": [
+    {
+      "text": "The world as we have created it is a process of our thinking.",
+      "author": "Albert Einstein",
+      "source": "toscrape",
+      "tags": ["change", "deep-thoughts", "thinking", "world"]
+    }
+  ],
+  "category": "inspirational",
+  "page": 1,
+  "page_size": 10,
+  "total": 40,
+  "total_pages": 4,
+  "has_next": true,
+  "has_previous": false
+}</code></pre>
+            </div>
+            <p class="font-mono text-sm mt-6 max-w-3xl">
+                Every quote carries <span class="text-accent">text</span>, <span class="text-accent">author</span>,
+                <span class="text-accent">source</span> and <span class="text-accent">tags</span>. Use
+                <span class="text-accent">has_next</span> to know when to stop paging. Results are collected live,
+                so <span class="text-accent">total</span> reflects what was retrieved for that request rather than a
+                fixed catalogue size.
+            </p>
+        </section>
+
+        <section class="mb-16 md:mb-24">
+            <h2 class="text-2xl md:text-3xl font-serif font-bold mb-6 reveal">Errors</h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div class="card p-6 md:p-8 border border-ink border-opacity-10 hover-invert">
+                    <h3 class="text-xl font-serif font-bold mb-4">422</h3>
+                    <p class="font-mono text-sm">
+                        A parameter failed validation — <code>page=0</code>, or a <code>page_size</code> above 100.
+                        The body lists what was rejected.
+                    </p>
+                </div>
+                <div class="card p-6 md:p-8 border border-ink border-opacity-10 hover-invert">
+                    <h3 class="text-xl font-serif font-bold mb-4">500</h3>
+                    <p class="font-mono text-sm">
+                        The request failed unexpectedly. Paging past the last page is not an error — you get an
+                        empty <code>quotes</code> array instead.
+                    </p>
+                </div>
+            </div>
+        </section>
+
+        <section class="text-center py-16 md:py-24">
+            <h2 class="text-3xl md:text-5xl font-serif font-bold mb-8 reveal">Go deeper</h2>
+            <div class="flex flex-col md:flex-row gap-4 justify-center font-mono text-sm">
+                <a href="/docs" class="px-8 py-4 border border-ink hover-invert">Try it in Swagger</a>
+                <a href="/redoc" class="px-8 py-4 border border-ink hover-invert">API Reference</a>
+                <a href="/pricing" class="px-8 py-4 border border-ink hover-invert">Pricing</a>
+            </div>
+        </section>
+
+    </main>
+
+    <footer class="border-t border-ink border-opacity-10 p-8 flex flex-col md:flex-row justify-between items-center gap-4 font-mono text-xs">
+        <span>&copy; 2026 Quotia</span>
+        <nav class="flex gap-6">
+            <a href="/quickstart" class="hover:text-accent">Quickstart</a>
+            <a href="/pricing" class="hover:text-accent">Pricing</a>
+            <a href="/docs" class="hover:text-accent">Docs</a>
+            <a href="/redoc" class="hover:text-accent">Reference</a>
+        </nav>
+    </footer>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.9.1/gsap.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.9.1/ScrollTrigger.min.js"></script>
+    <script src="/static/js/script.js"></script>
+</body>
+</html>

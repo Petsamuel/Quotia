@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
     <title>Quotia — Quotes API</title>
-    <meta name="description" content="Quotia is a free, developer-focused REST API that scrapes quotes from multiple public sources in parallel and returns clean, paginated JSON. Filter by category, page through results, no API key required.">
+    <meta name="description" content="Quotia is a developer-friendly quote API. Filter quotes by category, page through results, and get clean, predictable JSON back — one endpoint, no API key required.">
     <meta name="author" content="Quotia">
     <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1">
     <link rel="canonical" href="__BASE_URL__/">
@@ -14,7 +14,7 @@
     <meta property="og:type" content="website">
     <meta property="og:site_name" content="Quotia">
     <meta property="og:title" content="Quotia — Quotes API">
-    <meta property="og:description" content="A free REST API that scrapes quotes from multiple public sources in parallel and returns clean, paginated JSON. Filter by category, no API key required.">
+    <meta property="og:description" content="A developer-friendly quote API. Filter by category, page through results, and get clean, predictable JSON back — no API key required.">
     <meta property="og:url" content="__BASE_URL__/">
     <meta property="og:image" content="__BASE_URL__/static/assets/og-image.png">
     <meta property="og:image:width" content="1200">
@@ -25,7 +25,7 @@
     <!-- Twitter -->
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:title" content="Quotia — Quotes API">
-    <meta name="twitter:description" content="A free REST API that scrapes quotes from multiple public sources in parallel and returns clean, paginated JSON. Filter by category, no API key required.">
+    <meta name="twitter:description" content="A developer-friendly quote API. Filter by category, page through results, and get clean, predictable JSON back — no API key required.">
     <meta name="twitter:image" content="__BASE_URL__/static/assets/og-image.png">
     <meta name="twitter:image:alt" content="Quotia — Quotes API">
 
@@ -37,7 +37,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=Space+Mono&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="static/css/style.css">
+    <link rel="stylesheet" href="/static/css/style.css">
 
     <script type="application/ld+json">
     {
@@ -48,14 +48,14 @@
           "@id": "__BASE_URL__/#website",
           "url": "__BASE_URL__/",
           "name": "Quotia",
-          "description": "A free REST API that scrapes quotes from multiple public sources in parallel and returns clean, paginated JSON.",
+          "description": "A developer-friendly quote API returning clean, paginated JSON, filterable by category.",
           "inLanguage": "en"
         },
         {
           "@type": "WebAPI",
           "@id": "__BASE_URL__/#api",
           "name": "Quotia Quote API",
-          "description": "Scrapes quotes from quotes.toscrape.com and goodreads.com in parallel, deduplicates them, and returns paginated JSON filtered by category.",
+          "description": "Returns quotes as paginated JSON. Filter by category, control page size, and get consistent fields on every result.",
           "url": "__BASE_URL__/v1/quote",
           "documentation": "__BASE_URL__/redoc",
           "provider": { "@id": "__BASE_URL__/#website" },
@@ -79,20 +79,22 @@
     <div id="cursor" class="cursor"></div>
 
     <header class="fixed top-0 left-0 right-0 p-4 md:p-8 flex justify-between items-center z-50">
-        <div class="logo">
-            <img src="static/assets/logo.svg" alt="Quotia Logo" class="h-6 md:h-8">
-        </div>
-        <nav>
-            <a href="/docs" class="font-mono text-xs md:text-sm hover:text-accent">/docs</a>
+        <a href="/" class="logo">
+            <img src="/static/assets/logo.svg" alt="Quotia" class="h-6 md:h-8">
+        </a>
+        <nav class="flex gap-4 md:gap-8 font-mono text-xs md:text-sm">
+            <a href="/quickstart" class="hover:text-accent">Quickstart</a>
+            <a href="/pricing" class="hover:text-accent">Pricing</a>
+            <a href="/docs" class="hover:text-accent">Docs</a>
         </nav>
     </header>
 
     <main class="container mx-auto px-4 md:px-8 py-24 md:py-32">
         <section class="hero mb-24 md:mb-32">
             <h1 class="text-5xl md:text-8xl font-serif font-bold leading-none reveal">
-                Asynchronous<br>
-                Quote-Scraping<br>
-                <span class="text-accent">API</span>
+                Quotes,<br>
+                on demand,<br>
+                <span class="text-accent">as JSON</span>
             </h1>
         </section>
 
@@ -102,7 +104,7 @@
             </div>
             <div class="col-span-1 md:col-span-8">
                 <p class="text-base md:text-lg font-mono reveal">
-                    Quotia is a developer-focused API for scraping quotes from multiple sources in parallel. It's built for speed and reliability, delivering clean, structured JSON data with minimal fuss. No more dealing with complex scraping logic or maintaining brittle parsers.
+                    Quotia is a quote API for developers. One endpoint gives you quotes filtered by category, paged the way you want them, with the same clean fields on every result. Drop it into an app, a newsletter, or a side project without building any data plumbing of your own.
                 </p>
             </div>
         </section>
@@ -113,9 +115,9 @@
             </div>
             <div class="col-span-1 md:col-span-8 grid grid-cols-1 md:grid-cols-2 gap-8">
                 <div class="card p-6 md:p-8 border border-ink border-opacity-10 hover-invert">
-                    <h3 class="text-xl md:text-2xl font-serif font-bold mb-4">Fast & Parallel</h3>
+                    <h3 class="text-xl md:text-2xl font-serif font-bold mb-4">Fast by Default</h3>
                     <p class="font-mono text-sm">
-                        Leverage asynchronous scraping to pull data from multiple sources simultaneously. Get the data you need, faster.
+                        Responses are cached, so repeat requests come back immediately. No setup, no keys, no waiting on a dashboard.
                     </p>
                 </div>
                 <div class="card p-6 md:p-8 border border-ink border-opacity-10 hover-invert">
@@ -128,29 +130,13 @@
         </section>
 
         <section class="mb-24 md:mb-32">
-            <h2 class="text-3xl md:text-4xl font-serif font-bold mb-8 reveal">Simple Endpoint</h2>
+            <h2 class="text-3xl md:text-4xl font-serif font-bold mb-8 reveal">One Request</h2>
             <div class="bg-white p-6 md:p-8 border border-ink border-opacity-10 overflow-x-auto">
-                <pre class="font-mono text-sm"><code class="language-bash">GET /v1/quote?sources=goodreads,brainyquote</code></pre>
+                <pre class="font-mono text-sm"><code class="language-bash">curl "https://api.quotia.io/v1/quote?category=inspirational&amp;page_size=10"</code></pre>
             </div>
-        </section>
-
-        <section class="mb-24 md:mb-32">
-            <h2 class="text-3xl md:text-4xl font-serif font-bold mb-8 reveal">Quickstart</h2>
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
-                <div class="bg-white p-6 md:p-8 border border-ink border-opacity-10 overflow-x-auto">
-                    <h3 class="text-base md:text-lg font-mono font-bold mb-4">JavaScript</h3>
-                    <pre class="font-mono text-sm"><code class="language-js">fetch('https://api.quotia.io/v1/quote?sources=all')
-  .then(response => response.json())
-  .then(data => console.log(data));</code></pre>
-                </div>
-                <div class="bg-white p-6 md:p-8 border border-ink border-opacity-10 overflow-x-auto">
-                    <h3 class="text-base md:text-lg font-mono font-bold mb-4">Python</h3>
-                    <pre class="font-mono text-sm"><code class="language-python">import requests
-
-response = requests.get('https://api.quotia.io/v1/quote?sources=all')
-print(response.json())</code></pre>
-                </div>
-            </div>
+            <p class="font-mono text-sm mt-6">
+                <a href="/quickstart" class="hover:text-accent border-b border-ink border-opacity-30">See the full quickstart &rarr;</a>
+            </p>
         </section>
 
         <section id="quotes-section" class="mb-24 md:mb-32">
@@ -161,19 +147,28 @@ print(response.json())</code></pre>
         </section>
 
         <section id="docs" class="text-center py-24 md:py-32">
-            <a href="/redoc" class="text-3xl md:text-4xl font-serif font-bold hover:text-accent reveal">
-                Read the Docs
-            </a>
+            <h2 class="text-3xl md:text-5xl font-serif font-bold mb-8 reveal">Start building</h2>
+            <div class="flex flex-col md:flex-row gap-4 justify-center font-mono text-sm">
+                <a href="/quickstart" class="px-8 py-4 border border-ink hover-invert">Quickstart</a>
+                <a href="/pricing" class="px-8 py-4 border border-ink hover-invert">Pricing</a>
+                <a href="/redoc" class="px-8 py-4 border border-ink hover-invert">API Reference</a>
+            </div>
         </section>
 
     </main>
 
-    <footer class="text-center p-8 font-mono text-xs">
-        &copy; 2025 Quotia
+    <footer class="border-t border-ink border-opacity-10 p-8 flex flex-col md:flex-row justify-between items-center gap-4 font-mono text-xs">
+        <span>&copy; 2026 Quotia</span>
+        <nav class="flex gap-6">
+            <a href="/quickstart" class="hover:text-accent">Quickstart</a>
+            <a href="/pricing" class="hover:text-accent">Pricing</a>
+            <a href="/docs" class="hover:text-accent">Docs</a>
+            <a href="/redoc" class="hover:text-accent">Reference</a>
+        </nav>
     </footer>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.9.1/gsap.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.9.1/ScrollTrigger.min.js"></script>
-    <script src="static/js/script.js"></script>
+    <script src="/static/js/script.js"></script>
 </body>
 </html>

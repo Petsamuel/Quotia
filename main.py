@@ -26,8 +26,15 @@ from typing import Any, Optional, Dict, List
 
 # Resolve assets relative to this file so the app works from any working directory.
 BASE_DIR = Path(__file__).resolve().parent
-INDEX_FILE = BASE_DIR / "index.html"
 STATIC_DIR = BASE_DIR / "static"
+
+# Public HTML pages, in the order they should appear in sitemap.xml. Each is a
+# plain file rendered through render_page() so its SEO tags get the real origin.
+HTML_PAGES = [
+    ("/", "index.html", "1.0"),
+    ("/quickstart", "quickstart.html", "0.9"),
+    ("/pricing", "pricing.html", "0.9"),
+]
 
 QUOTES_ENDPOINT = "/v1/quote"
 
@@ -57,11 +64,15 @@ MAX_SOURCE_PAGES = 5
 QUOTES_PER_SOURCE_PAGE = 10
 
 DESCRIPTION = """
-Quotia aggregates quotes scraped on demand from public quote sites.
+A quote API for developers. One endpoint returns quotes as clean, paginated JSON,
+filterable by category.
 
 `GET /v1/quote` is the API. The site root `/` serves the landing page.
 
-## Sources
+## Attribution
+
+Quotes are collected from public quote sites and returned with a `source` field
+so you can attribute them:
 
 * **toscrape** — [quotes.toscrape.com](http://quotes.toscrape.com)
 * **goodreads** — [goodreads.com/quotes](https://www.goodreads.com/quotes)
@@ -72,11 +83,11 @@ Pass `category` to restrict results to a tag (`love`, `inspirational`, `humor`, 
 Use `page` and `page_size` to walk the merged result set; the response carries
 `total`, `total_pages`, `has_next` and `has_previous` alongside the quotes.
 
-Because quotes are scraped live, `total` counts what was retrieved for this
-request (up to {max_pages} pages per source), not the full upstream catalogue.
+Because results are collected live, `total` counts what was retrieved for this
+request (up to {max_pages} pages per source), not a fixed catalogue size.
 
 Results are cached in memory for 5 minutes per `category`/`page`/`page_size`
-combination, so repeated identical calls do not re-scrape the upstream sites.
+combination, so repeated identical calls are served straight from cache.
 
 ## Interactive documentation
 
@@ -88,13 +99,13 @@ combination, so repeated identical calls do not re-scrape the upstream sites.
 TAGS_METADATA = [
     {
         "name": "quotes",
-        "description": "Scrape and return quotes, optionally filtered by category.",
+        "description": "Fetch quotes as paginated JSON, optionally filtered by category.",
     },
 ]
 
 app = FastAPI(
     title="Quotia",
-    summary="A quote aggregation API that scrapes quotes from multiple public sources.",
+    summary="A developer-friendly quote API returning clean, paginated JSON.",
     description=DESCRIPTION,
     version="1.0.0",
     openapi_tags=TAGS_METADATA,
@@ -116,7 +127,7 @@ app = FastAPI(
 
 
 class Quote(BaseModel):
-    """A single scraped quote."""
+    """A single quote."""
 
     text: str = Field(..., description="The quote text, without surrounding quotation marks.")
     author: str = Field(..., description="Name of the person the quote is attributed to.")
@@ -152,8 +163,8 @@ class QuotesResponse(BaseModel):
     total: int = Field(
         ...,
         description=(
-            "Number of unique quotes retrieved for this request. Quotes are scraped live, "
-            "so this reflects what the sources returned rather than their full catalogue."
+            "Number of unique quotes retrieved for this request. Results are collected live, "
+            "so this reflects what the sources returned rather than a fixed catalogue size."
         ),
         ge=0,
     )
@@ -192,18 +203,28 @@ def resolve_base_url(request: Request) -> str:
         return configured.rstrip("/")
     return str(request.base_url).rstrip("/")
 
-@lru_cache(maxsize=8)
-def render_index(base_url: str) -> str:
-    """Read index.html and bake the public origin into its canonical/OG/JSON-LD tags."""
-    return INDEX_FILE.read_text(encoding="utf-8").replace(BASE_URL_PLACEHOLDER, base_url)
+@lru_cache(maxsize=32)
+def render_page(filename: str, base_url: str) -> str:
+    """Read a page and bake the public origin into its canonical/OG/JSON-LD tags."""
+    return (BASE_DIR / filename).read_text(encoding="utf-8").replace(BASE_URL_PLACEHOLDER, base_url)
 
-@app.get("/", include_in_schema=False)
-async def index(request: Request) -> HTMLResponse:
-    """Serve the landing page. The quotes API lives at /v1/quote."""
-    if not INDEX_FILE.is_file():
-        logger.error(f"index.html not found at {INDEX_FILE}")
-        raise HTTPException(status_code=404, detail="index.html not found")
-    return HTMLResponse(render_index(resolve_base_url(request)))
+def make_page_route(filename: str):
+    """Build a handler that serves one templated HTML page."""
+    async def page(request: Request) -> HTMLResponse:
+        if not (BASE_DIR / filename).is_file():
+            logger.error(f"{filename} not found in {BASE_DIR}")
+            raise HTTPException(status_code=404, detail=f"{filename} not found")
+        return HTMLResponse(render_page(filename, resolve_base_url(request)))
+    return page
+
+for _path, _filename, _priority in HTML_PAGES:
+    app.add_api_route(
+        _path,
+        make_page_route(_filename),
+        methods=["GET"],
+        response_class=HTMLResponse,
+        include_in_schema=False,
+    )
 
 @app.get("/doc", include_in_schema=False)
 @app.get("/doc/", include_in_schema=False)
@@ -227,7 +248,8 @@ Sitemap: {base_url}/sitemap.xml
 async def sitemap_xml(request: Request) -> Response:
     """List the human-readable pages worth indexing."""
     base_url = resolve_base_url(request)
-    pages = [("/", "1.0"), ("/docs", "0.8"), ("/redoc", "0.8")]
+    pages = [(path, priority) for path, _filename, priority in HTML_PAGES]
+    pages += [("/docs", "0.8"), ("/redoc", "0.8")]
     entries = "\n".join(
         f"  <url>\n"
         f"    <loc>{xml_escape(base_url + path)}</loc>\n"
@@ -250,13 +272,14 @@ async def llms_txt(request: Request) -> PlainTextResponse:
     base_url = resolve_base_url(request)
     body = f"""# Quotia
 
-> A free, developer-focused REST API that scrapes quotes from multiple public
-> sources in parallel, deduplicates them, and returns clean paginated JSON.
+> A developer-friendly quote API. One endpoint returns quotes as clean, paginated
+> JSON, filterable by category.
 
 Quotia exposes one endpoint and requires no authentication or API key. Quotes are
-scraped live from public sites and cached in memory for 5 minutes. Because results
-are scraped per request, `total` reflects what was retrieved for that request
-rather than a fixed catalogue size.
+collected live from public quote sites and cached in memory for 5 minutes. Because
+results are collected per request, `total` reflects what was retrieved for that
+request rather than a fixed catalogue size. Each quote carries a `source` field
+for attribution.
 
 ## API
 
@@ -268,12 +291,14 @@ rather than a fixed catalogue size.
 
 ## Docs
 
+- [Quickstart]({base_url}/quickstart): First request, every parameter, and the response shape.
+- [Pricing]({base_url}/pricing): Plans and limits.
 - [OpenAPI schema]({base_url}/openapi.json): Machine-readable specification of the API.
 - [ReDoc reference]({base_url}/redoc): Reference-style documentation.
 - [Swagger UI]({base_url}/docs): Interactive documentation you can send requests from.
 - [Full details]({base_url}/llms-full.txt): Parameters, response schema and examples in one file.
 
-## Sources
+## Attribution
 
 - [quotes.toscrape.com](http://quotes.toscrape.com): Reported as `source: "toscrape"`.
 - [goodreads.com/quotes](https://www.goodreads.com/quotes): Reported as `source: "goodreads"`.
@@ -305,15 +330,15 @@ async def llms_full_txt(request: Request) -> PlainTextResponse:
 ```"""
     body = f"""# Quotia — full reference
 
-> A free, developer-focused REST API that scrapes quotes from multiple public
-> sources in parallel, deduplicates them, and returns clean paginated JSON.
+> A developer-friendly quote API. One endpoint returns quotes as clean, paginated
+> JSON, filterable by category.
 
 Base URL: {base_url}
 No authentication is required.
 
 ## GET {QUOTES_ENDPOINT}
 
-Scrapes every configured source concurrently, merges the results, removes
+Queries every configured source concurrently, merges the results, removes
 duplicates, and returns one page. A source that fails or returns a non-200 status
 is skipped rather than failing the request.
 
@@ -332,9 +357,9 @@ is skipped rather than failing the request.
   (array of strings, may be empty when the source lists none).
 - `category` (string or null): The normalized category that was applied.
 - `page`, `page_size` (integer): Echo of the pagination request.
-- `total` (integer): Unique quotes retrieved for this request. Scraping is live and
-  bounded to {MAX_SOURCE_PAGES} pages per source, so this is not a fixed catalogue size and can
-  differ between requests with different `page_size` values.
+- `total` (integer): Unique quotes retrieved for this request. Collection is live
+  and bounded to {MAX_SOURCE_PAGES} pages per source, so this is not a fixed catalogue size and
+  can differ between requests with different `page_size` values.
 - `total_pages` (integer): `total` divided by `page_size`, rounded up.
 - `has_next`, `has_previous` (boolean): Whether adjacent pages exist.
 
@@ -348,7 +373,7 @@ Request: `GET {base_url}{QUOTES_ENDPOINT}?category=inspirational&page=1&page_siz
 
 - `422 Unprocessable Entity`: A parameter failed validation, e.g. `page=0` or
   `page_size` above {MAX_PAGE_SIZE}. The body has FastAPI's standard `detail` array.
-- `500 Internal Server Error`: Scraping failed unexpectedly. The body is
+- `500 Internal Server Error`: The request failed unexpectedly. The body is
   `{{"detail": "Internal server error"}}`.
 
 ## Behaviour notes
@@ -357,11 +382,13 @@ Request: `GET {base_url}{QUOTES_ENDPOINT}?category=inspirational&page=1&page_siz
 - Page 1 of every source is fetched before page 2 of any source, so lower `page`
   values hold the most prominent quotes.
 - Quotes appearing on both sources are returned once, keeping the first occurrence.
-- Quotes are scraped from third-party sites; check their terms before redistributing.
+- Quotes originate from third-party sites; check their terms before redistributing.
 
 ## Other endpoints
 
 - `GET /` — landing page.
+- `GET /quickstart` — quickstart guide.
+- `GET /pricing` — plans and limits.
 - `GET /docs` — Swagger UI.
 - `GET /redoc` — ReDoc reference. `/doc` and `/doc/` redirect here.
 - `GET /openapi.json` — OpenAPI schema.
@@ -487,7 +514,7 @@ async def scrape_url(session: aiohttp.ClientSession, url: str) -> List[Dict[str,
     responses={
         500: {
             "model": ErrorResponse,
-            "description": "Scraping failed unexpectedly for every source.",
+            "description": "The request failed unexpectedly.",
         }
     },
 )
@@ -516,15 +543,15 @@ async def get_quotes(
     """
     Fetch quotes from every configured source, merge them, and return one page.
 
-    Each source is scraped concurrently; a source that fails or returns a
+    Each source is queried concurrently; a source that fails or returns a
     non-200 status is logged and skipped rather than failing the whole request.
     Duplicates across sources are removed before paging, and page 1 of every
     source is fetched before page 2 of any, so lower `page` values hold the
     most prominent quotes.
 
-    Deep pages require more scraping, so at most 5 pages are pulled per source.
-    A `page` beyond what the sources returned yields an empty `quotes` list
-    rather than an error.
+    Deep pages require more upstream requests, so at most 5 pages are pulled per
+    source. A `page` beyond what the sources returned yields an empty `quotes`
+    list rather than an error.
 
     Responses are cached for 5 minutes per `category`/`page`/`page_size`.
     """

@@ -16,8 +16,6 @@ import hashlib
 import logging
 import random
 import sqlite3
-import subprocess
-import sys
 from datetime import date, datetime, timezone
 from functools import lru_cache
 from pathlib import Path
@@ -43,19 +41,46 @@ MAX_WORDS = 40
 PLACEMENT_ATTEMPTS = 60
 
 
-def ensure_database() -> None:
+_db_checked = False
+
+
+def ensure_database(force: bool = False) -> None:
     """Build the word bank if it is missing or older than its seed file.
 
-    Keeps local development a one-step affair: the database is a generated
-    artifact, so there is nothing to commit and nothing to remember.
+    Checked once per process, not per request. Two reasons that matters:
+    rebuilding on every query would be wasteful, and on Windows the swap into
+    place fails outright while this process holds the database open — which
+    previously turned an edited seed file into a permanent 500.
+
+    A failed rebuild is therefore non-fatal whenever a usable database already
+    exists: serve the existing words and say so. Only a completely missing
+    database is worth failing for.
     """
-    if DB_FILE.is_file() and DB_FILE.stat().st_mtime >= SEED_FILE.stat().st_mtime:
+    global _db_checked
+    if _db_checked and not force:
         return
+    _db_checked = True
 
-    logger.info("Building crossword word bank at %s", DB_FILE)
-    import build_wordbank
+    try:
+        stale = (
+            not DB_FILE.is_file()
+            or DB_FILE.stat().st_mtime < SEED_FILE.stat().st_mtime
+        )
+        if not stale:
+            return
 
-    build_wordbank.build(build_wordbank.load_seed(), DB_FILE)
+        logger.info("Building crossword word bank at %s", DB_FILE)
+        import build_wordbank
+
+        build_wordbank.build(build_wordbank.load_seed(), DB_FILE)
+    except Exception as error:
+        if not DB_FILE.is_file():
+            raise
+        logger.warning(
+            "Could not rebuild the word bank (%s). Serving the existing database; "
+            "restart the app, or run build_wordbank.py, to pick up seed changes.",
+            error,
+        )
 
 
 def connect() -> sqlite3.Connection:

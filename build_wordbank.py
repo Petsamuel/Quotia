@@ -72,7 +72,7 @@ def build(seed: Dict[str, List[Dict[str, str]]], destination: Path) -> Dict[str,
 
         for category, entries in seed.items():
             name = category.strip().lower()
-            cursor = connection.execute(
+            connection.execute(
                 "INSERT OR IGNORE INTO categories (name) VALUES (?)", (name,)
             )
             category_id = connection.execute(
@@ -112,7 +112,13 @@ def build(seed: Dict[str, List[Dict[str, str]]], destination: Path) -> Dict[str,
     finally:
         connection.close()
 
-    os.replace(temp, destination)
+    try:
+        os.replace(temp, destination)
+    except OSError:
+        # Windows refuses to replace a file another process holds open. Don't
+        # leave the half-swapped temp file lying around for the next run.
+        temp.unlink(missing_ok=True)
+        raise
     return stats
 
 

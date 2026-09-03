@@ -252,6 +252,12 @@ header .logo.is-over-dark img {
     gap: 1rem;
 }
 
+/* An author `display` beats the UA's [hidden] rule, so the attribute alone
+   would leave this panel on screen. */
+.cw-options[hidden] {
+    display: none;
+}
+
 .cw-options__row {
     display: flex;
     flex-wrap: wrap;

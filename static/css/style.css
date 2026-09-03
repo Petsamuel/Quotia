@@ -128,6 +128,25 @@ body {
     outline: none;
 }
 
+.quote-card {
+    display: flex;
+    flex-direction: column;
+}
+
+/* Some sources carry essay-length quotes. Clamp the display so one long entry
+   cannot stretch its whole grid row; the copy button still yields the full text. */
+.quote-card__text {
+    display: -webkit-box;
+    -webkit-line-clamp: 6;
+    line-clamp: 6;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.quote-card__author {
+    margin-top: auto;
+}
+
 .quote-copy {
     flex-shrink: 0;
     display: inline-flex;

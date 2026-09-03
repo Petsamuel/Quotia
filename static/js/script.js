@@ -137,8 +137,9 @@ function buildQuoteCard(quote) {
     head.className = 'flex justify-between items-start gap-4 mb-4';
 
     const text = document.createElement('p');
-    text.className = 'font-mono text-sm';
+    text.className = 'font-mono text-sm quote-card__text';
     text.textContent = `“${quote.text}”`;
+    text.title = quote.text;
 
     const button = document.createElement('button');
     button.type = 'button';
@@ -152,7 +153,7 @@ function buildQuoteCard(quote) {
     head.appendChild(button);
 
     const author = document.createElement('h3');
-    author.className = 'text-lg font-serif font-bold';
+    author.className = 'text-lg font-serif font-bold quote-card__author';
     author.textContent = quote.author;
 
     card.appendChild(head);

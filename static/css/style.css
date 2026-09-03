@@ -71,13 +71,164 @@ body {
     color: var(--color-background);
 }
 
+/* Reveal animations.
+
+   The hidden state is scoped to .js-anim, a class an inline <head> script adds.
+   That way content is hidden only when scripting is actually available to
+   un-hide it: with JS off the class is never added, and if GSAP fails to load
+   script.js strips the class, so text can never be left permanently clipped. */
 .reveal {
+    will-change: clip-path, transform;
+}
+
+.js-anim .reveal {
     clip-path: polygon(0 100%, 100% 100%, 100% 100%, 0 100%);
-    transition: clip-path 0.8s cubic-bezier(0.19, 1, 0.22, 1);
     transform: translateY(10px);
 }
 
-.reveal.visible {
+.js-anim .reveal.visible {
     clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%);
     transform: translateY(0);
+}
+
+.js-anim .reveal-group > * {
+    opacity: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .js-anim .reveal {
+        clip-path: none;
+        transform: none;
+    }
+
+    .js-anim .reveal-group > * {
+        opacity: 1;
+    }
+}
+
+/* ---------- Code blocks ---------- */
+
+.code-block {
+    background-color: var(--color-text);
+    color: var(--color-background);
+    border: 1px solid var(--color-text);
+    overflow: hidden;
+}
+
+.code-block__bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.75rem 1.25rem;
+    border-bottom: 1px solid rgba(242, 240, 234, 0.15);
+}
+
+.code-block__lang {
+    font-size: 0.7rem;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: rgba(242, 240, 234, 0.5);
+}
+
+.code-block__copy {
+    font-family: 'Space Mono', monospace;
+    font-size: 0.7rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: rgba(242, 240, 234, 0.6);
+    background: none;
+    border: 1px solid rgba(242, 240, 234, 0.25);
+    padding: 0.3rem 0.8rem;
+    cursor: none;
+    transition: color 0.2s, border-color 0.2s;
+}
+
+.code-block__copy:hover {
+    color: var(--color-background);
+    border-color: rgba(242, 240, 234, 0.6);
+}
+
+.code-block__copy.copied {
+    color: var(--color-accent);
+    border-color: var(--color-accent);
+}
+
+@media (max-width: 768px) {
+    .code-block__copy {
+        cursor: pointer;
+    }
+}
+
+.code-block__body {
+    margin: 0;
+    padding: 1.5rem 1.25rem;
+    overflow-x: auto;
+    font-size: 0.8rem;
+    line-height: 1.7;
+}
+
+.code-block__body code {
+    font-family: 'Space Mono', monospace;
+    color: var(--color-background);
+    background: none;
+    white-space: pre;
+}
+
+/* Inline code inside body copy */
+:not(pre) > code {
+    font-family: 'Space Mono', monospace;
+    font-size: 0.85em;
+    padding: 0.1em 0.4em;
+    background-color: rgba(5, 5, 5, 0.07);
+    border-radius: 2px;
+}
+
+/* Prism tokens, tuned to the Quotia palette on a near-black ground */
+.code-block__body .token.comment,
+.code-block__body .token.prolog,
+.code-block__body .token.doctype,
+.code-block__body .token.cdata {
+    color: rgba(242, 240, 234, 0.4);
+}
+
+.code-block__body .token.punctuation {
+    color: rgba(242, 240, 234, 0.55);
+}
+
+.code-block__body .token.string,
+.code-block__body .token.char,
+.code-block__body .token.attr-value,
+.code-block__body .token.inserted {
+    color: #7FD1AE;
+}
+
+.code-block__body .token.number,
+.code-block__body .token.boolean,
+.code-block__body .token.constant,
+.code-block__body .token.symbol {
+    color: #FFB86C;
+}
+
+.code-block__body .token.keyword,
+.code-block__body .token.operator,
+.code-block__body .token.tag,
+.code-block__body .token.deleted {
+    color: #FF6B6B;
+}
+
+.code-block__body .token.function,
+.code-block__body .token.class-name {
+    color: #F2F0EA;
+    font-weight: bold;
+}
+
+.code-block__body .token.property,
+.code-block__body .token.attr-name {
+    color: #A8C7FA;
+}
+
+.code-block__body .token.builtin,
+.code-block__body .token.variable {
+    color: #E9D2A0;
 }

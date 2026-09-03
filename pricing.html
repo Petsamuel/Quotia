@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
     <title>Pricing — Quotia</title>
-    <meta name="description" content="Quotia pricing. Start free with no API key, upgrade for higher volume and support. Simple per-month plans for the quote API.">
+    <meta name="description" content="Quotia pricing. Free to use — no signup, no API key, no card. One plan with full access to the quote API and its docs.">
     <meta name="author" content="Quotia">
     <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1">
     <link rel="canonical" href="__BASE_URL__/pricing">
@@ -14,7 +14,7 @@
     <meta property="og:type" content="website">
     <meta property="og:site_name" content="Quotia">
     <meta property="og:title" content="Pricing — Quotia">
-    <meta property="og:description" content="Start free with no API key, upgrade for higher volume and support. Simple per-month plans for the quote API.">
+    <meta property="og:description" content="Quotia is free to use — no signup, no API key, no card. One plan with full access to the quote API and its docs.">
     <meta property="og:url" content="__BASE_URL__/pricing">
     <meta property="og:image" content="__BASE_URL__/static/assets/og-image.png">
     <meta property="og:image:width" content="1200">
@@ -25,7 +25,7 @@
     <!-- Twitter -->
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:title" content="Pricing — Quotia">
-    <meta name="twitter:description" content="Start free with no API key, upgrade for higher volume and support. Simple per-month plans for the quote API.">
+    <meta name="twitter:description" content="Quotia is free to use — no signup, no API key, no card. One plan with full access to the quote API and its docs.">
     <meta name="twitter:image" content="__BASE_URL__/static/assets/og-image.png">
     <meta name="twitter:image:alt" content="Quotia — the quote API for developers">
 
@@ -38,6 +38,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=Space+Mono&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/static/css/style.css">
+    <script>document.documentElement.classList.add('js-anim');</script>
 </head>
 <body class="bg-stone-100 text-ink">
 
@@ -61,59 +62,38 @@
                 Pricing
             </h1>
             <p class="text-base md:text-lg font-mono max-w-2xl reveal">
-                Start free, with no signup and no API key. Move up when you need more volume or a response time you can put in a contract.
+                One plan, free. No signup, no API key, no card. Send a request and you are already using it.
             </p>
         </section>
 
-        <section class="mb-16 md:mb-24 grid grid-cols-1 md:grid-cols-3 gap-8">
-
-            <div class="card p-8 border border-ink border-opacity-10 flex flex-col">
-                <h2 class="text-2xl font-serif font-bold mb-2">Free</h2>
-                <p class="font-mono text-4xl font-bold mb-6">$0</p>
-                <p class="font-mono text-sm mb-8">For side projects and trying things out.</p>
-                <ul class="font-mono text-sm space-y-3 mb-8 flex-grow">
-                    <li>1,000 requests per day</li>
-                    <li>All categories</li>
-                    <li>No API key required</li>
-                    <li>Community support</li>
-                </ul>
-                <a href="/quickstart" class="text-center px-6 py-4 border border-ink hover-invert font-mono text-sm">Start now</a>
-            </div>
-
-            <div class="card p-8 border-2 border-accent flex flex-col">
+        <section class="mb-16 md:mb-24 reveal-group">
+            <div class="card p-8 md:p-12 border-2 border-accent max-w-2xl">
                 <div class="flex justify-between items-start mb-2">
-                    <h2 class="text-2xl font-serif font-bold">Pro</h2>
-                    <span class="font-mono text-xs text-accent">POPULAR</span>
+                    <h2 class="text-3xl font-serif font-bold">Free</h2>
+                    <span class="font-mono text-xs text-accent">CURRENT PLAN</span>
                 </div>
-                <p class="font-mono text-4xl font-bold mb-6">$19<span class="text-base font-normal">/mo</span></p>
-                <p class="font-mono text-sm mb-8">For production apps that need headroom.</p>
-                <ul class="font-mono text-sm space-y-3 mb-8 flex-grow">
-                    <li>100,000 requests per month</li>
-                    <li>Higher rate limits</li>
-                    <li>API key &amp; usage dashboard</li>
-                    <li>Email support</li>
+                <p class="font-mono text-5xl font-bold mb-6">$0</p>
+                <p class="font-mono text-sm mb-8">
+                    Everything Quotia does, at no cost. No signup, no card, no key to rotate.
+                </p>
+                <ul class="font-mono text-sm space-y-3 mb-10">
+                    <li>&mdash; Unlimited categories</li>
+                    <li>&mdash; Up to 100 quotes per request</li>
+                    <li>&mdash; No API key, no signup</li>
+                    <li>&mdash; Full OpenAPI schema and docs</li>
+                    <li>&mdash; Fair use, so everyone stays fast</li>
                 </ul>
-                <a href="mailto:hello@quotia.io?subject=Quotia%20Pro" class="text-center px-6 py-4 border border-ink hover-invert font-mono text-sm">Get Pro</a>
+                <a href="/quickstart" class="inline-block text-center px-8 py-4 border border-ink hover-invert font-mono text-sm">Make your first request</a>
             </div>
-
-            <div class="card p-8 border border-ink border-opacity-10 flex flex-col">
-                <h2 class="text-2xl font-serif font-bold mb-2">Business</h2>
-                <p class="font-mono text-4xl font-bold mb-6">Custom</p>
-                <p class="font-mono text-sm mb-8">For high volume and contractual guarantees.</p>
-                <ul class="font-mono text-sm space-y-3 mb-8 flex-grow">
-                    <li>Unlimited requests</li>
-                    <li>Uptime SLA</li>
-                    <li>Dedicated support channel</li>
-                    <li>Invoicing</li>
-                </ul>
-                <a href="mailto:hello@quotia.io?subject=Quotia%20Business" class="text-center px-6 py-4 border border-ink hover-invert font-mono text-sm">Talk to us</a>
-            </div>
-
+            <p class="font-mono text-sm mt-8 max-w-2xl opacity-70">
+                Paid plans will land when Quotia grows beyond what free can carry. Anything already
+                built on the API keeps working, and you will hear about changes well before they happen.
+            </p>
         </section>
 
         <section class="mb-16 md:mb-24">
             <h2 class="text-2xl md:text-3xl font-serif font-bold mb-8 reveal">Questions</h2>
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-8 reveal-group">
                 <div>
                     <h3 class="text-lg font-serif font-bold mb-3">Do I need an API key to start?</h3>
                     <p class="font-mono text-sm">No. The free tier works straight from a browser or terminal with no signup at all.</p>
@@ -127,15 +107,15 @@
                     <p class="font-mono text-sm">Quotes originate from third-party sites. Check the terms of the listed source before redistributing.</p>
                 </div>
                 <div>
-                    <h3 class="text-lg font-serif font-bold mb-3">Can I change plans later?</h3>
-                    <p class="font-mono text-sm">Yes — move up or down whenever you need to. Nothing is locked in.</p>
+                    <h3 class="text-lg font-serif font-bold mb-3">Will it stay free?</h3>
+                    <p class="font-mono text-sm">The free tier is here to stay. If paid plans arrive for heavier use, existing projects get notice first.</p>
                 </div>
             </div>
         </section>
 
         <section class="text-center py-16 md:py-24">
             <h2 class="text-3xl md:text-5xl font-serif font-bold mb-8 reveal">Try it first</h2>
-            <div class="flex flex-col md:flex-row gap-4 justify-center font-mono text-sm">
+            <div class="flex flex-col md:flex-row gap-4 justify-center font-mono text-sm reveal-group">
                 <a href="/quickstart" class="px-8 py-4 border border-ink hover-invert">Quickstart</a>
                 <a href="/docs" class="px-8 py-4 border border-ink hover-invert">Try it in Swagger</a>
             </div>
@@ -143,18 +123,29 @@
 
     </main>
 
-    <footer class="border-t border-ink border-opacity-10 p-8 flex flex-col md:flex-row justify-between items-center gap-4 font-mono text-xs">
-        <span>&copy; 2026 Quotia</span>
-        <nav class="flex gap-6">
-            <a href="/quickstart" class="hover:text-accent">Quickstart</a>
-            <a href="/pricing" class="hover:text-accent">Pricing</a>
-            <a href="/docs" class="hover:text-accent">Docs</a>
-            <a href="/redoc" class="hover:text-accent">Reference</a>
-        </nav>
+    <footer class="border-t border-ink border-opacity-10 px-4 md:px-8 pt-12 pb-8 font-mono text-xs">
+        <div class="container mx-auto">
+            <div class="flex flex-col md:flex-row gap-10 md:gap-24 mb-12">
+                <nav class="flex flex-col gap-3">
+                    <span class="opacity-50 uppercase tracking-widest">Quotia</span>
+                    <a href="/quickstart" class="hover:text-accent">Quickstart</a>
+                    <a href="/pricing" class="hover:text-accent">Pricing</a>
+                    <a href="/docs" class="hover:text-accent">Docs</a>
+                    <a href="/redoc" class="hover:text-accent">API Reference</a>
+                </nav>
+                <nav class="flex flex-col gap-3">
+                    <span class="opacity-50 uppercase tracking-widest">More by the developer</span>
+                    <a href="https://viblify.pages.dev/" target="_blank" rel="noopener noreferrer" class="hover:text-accent">Viblify &#8599;</a>
+                    <a href="https://pikka.pages.dev/" target="_blank" rel="noopener noreferrer" class="hover:text-accent">Pikka &#8599;</a>
+                </nav>
+            </div>
+            <div class="border-t border-ink border-opacity-10 pt-6">
+                &copy; 2026 Quotia
+            </div>
+        </div>
     </footer>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.9.1/gsap.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.9.1/ScrollTrigger.min.js"></script>
     <script src="/static/js/script.js"></script>
 </body>
 </html>

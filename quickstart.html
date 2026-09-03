@@ -38,6 +38,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=Space+Mono&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/static/css/style.css">
+    <script>document.documentElement.classList.add('js-anim');</script>
 
     <script type="application/ld+json">
     {
@@ -79,30 +80,43 @@
 
         <section class="mb-16 md:mb-24">
             <h2 class="text-2xl md:text-3xl font-serif font-bold mb-6 reveal">Base URL</h2>
-            <div class="bg-white p-6 border border-ink border-opacity-10 overflow-x-auto">
-                <pre class="font-mono text-sm"><code>https://api.quotia.io/v1/quote</code></pre>
+            <div class="code-block">
+                <div class="code-block__bar">
+                    <span class="code-block__lang">endpoint</span>
+                    <button type="button" class="code-block__copy">Copy</button>
+                </div>
+                <pre class="code-block__body"><code>https://api.quotia.io/v1/quote</code></pre>
             </div>
         </section>
 
         <section class="mb-16 md:mb-24">
             <h2 class="text-2xl md:text-3xl font-serif font-bold mb-6 reveal">Your first request</h2>
-            <div class="bg-white p-6 md:p-8 border border-ink border-opacity-10 overflow-x-auto mb-8">
-                <h3 class="text-base font-mono font-bold mb-4">curl</h3>
-                <pre class="font-mono text-sm"><code class="language-bash">curl "https://api.quotia.io/v1/quote?category=inspirational&amp;page_size=10"</code></pre>
+            <div class="code-block mb-8">
+                <div class="code-block__bar">
+                    <span class="code-block__lang">bash</span>
+                    <button type="button" class="code-block__copy">Copy</button>
+                </div>
+                <pre class="code-block__body"><code class="language-bash">curl "https://api.quotia.io/v1/quote?category=inspirational&amp;page_size=10"</code></pre>
             </div>
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
-                <div class="bg-white p-6 md:p-8 border border-ink border-opacity-10 overflow-x-auto">
-                    <h3 class="text-base font-mono font-bold mb-4">JavaScript</h3>
-                    <pre class="font-mono text-sm"><code class="language-js">const res = await fetch(
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-8 reveal-group">
+                <div class="code-block">
+                    <div class="code-block__bar">
+                        <span class="code-block__lang">javascript</span>
+                        <button type="button" class="code-block__copy">Copy</button>
+                    </div>
+                    <pre class="code-block__body"><code class="language-js">const res = await fetch(
   'https://api.quotia.io/v1/quote?category=love'
 );
 const data = await res.json();
 
 console.log(data.quotes);</code></pre>
                 </div>
-                <div class="bg-white p-6 md:p-8 border border-ink border-opacity-10 overflow-x-auto">
-                    <h3 class="text-base font-mono font-bold mb-4">Python</h3>
-                    <pre class="font-mono text-sm"><code class="language-python">import requests
+                <div class="code-block">
+                    <div class="code-block__bar">
+                        <span class="code-block__lang">python</span>
+                        <button type="button" class="code-block__copy">Copy</button>
+                    </div>
+                    <pre class="code-block__body"><code class="language-python">import requests
 
 res = requests.get(
     'https://api.quotia.io/v1/quote',
@@ -151,8 +165,12 @@ print(res.json()['quotes'])</code></pre>
 
         <section class="mb-16 md:mb-24">
             <h2 class="text-2xl md:text-3xl font-serif font-bold mb-6 reveal">Response</h2>
-            <div class="bg-white p-6 md:p-8 border border-ink border-opacity-10 overflow-x-auto">
-                <pre class="font-mono text-sm"><code class="language-json">{
+            <div class="code-block">
+                <div class="code-block__bar">
+                    <span class="code-block__lang">json</span>
+                    <button type="button" class="code-block__copy">Copy</button>
+                </div>
+                <pre class="code-block__body"><code class="language-json">{
   "quotes": [
     {
       "text": "The world as we have created it is a process of our thinking.",
@@ -181,7 +199,7 @@ print(res.json()['quotes'])</code></pre>
 
         <section class="mb-16 md:mb-24">
             <h2 class="text-2xl md:text-3xl font-serif font-bold mb-6 reveal">Errors</h2>
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-8 reveal-group">
                 <div class="card p-6 md:p-8 border border-ink border-opacity-10 hover-invert">
                     <h3 class="text-xl font-serif font-bold mb-4">422</h3>
                     <p class="font-mono text-sm">
@@ -201,7 +219,7 @@ print(res.json()['quotes'])</code></pre>
 
         <section class="text-center py-16 md:py-24">
             <h2 class="text-3xl md:text-5xl font-serif font-bold mb-8 reveal">Go deeper</h2>
-            <div class="flex flex-col md:flex-row gap-4 justify-center font-mono text-sm">
+            <div class="flex flex-col md:flex-row gap-4 justify-center font-mono text-sm reveal-group">
                 <a href="/docs" class="px-8 py-4 border border-ink hover-invert">Try it in Swagger</a>
                 <a href="/redoc" class="px-8 py-4 border border-ink hover-invert">API Reference</a>
                 <a href="/pricing" class="px-8 py-4 border border-ink hover-invert">Pricing</a>
@@ -210,18 +228,35 @@ print(res.json()['quotes'])</code></pre>
 
     </main>
 
-    <footer class="border-t border-ink border-opacity-10 p-8 flex flex-col md:flex-row justify-between items-center gap-4 font-mono text-xs">
-        <span>&copy; 2026 Quotia</span>
-        <nav class="flex gap-6">
-            <a href="/quickstart" class="hover:text-accent">Quickstart</a>
-            <a href="/pricing" class="hover:text-accent">Pricing</a>
-            <a href="/docs" class="hover:text-accent">Docs</a>
-            <a href="/redoc" class="hover:text-accent">Reference</a>
-        </nav>
+    <footer class="border-t border-ink border-opacity-10 px-4 md:px-8 pt-12 pb-8 font-mono text-xs">
+        <div class="container mx-auto">
+            <div class="flex flex-col md:flex-row gap-10 md:gap-24 mb-12">
+                <nav class="flex flex-col gap-3">
+                    <span class="opacity-50 uppercase tracking-widest">Quotia</span>
+                    <a href="/quickstart" class="hover:text-accent">Quickstart</a>
+                    <a href="/pricing" class="hover:text-accent">Pricing</a>
+                    <a href="/docs" class="hover:text-accent">Docs</a>
+                    <a href="/redoc" class="hover:text-accent">API Reference</a>
+                </nav>
+                <nav class="flex flex-col gap-3">
+                    <span class="opacity-50 uppercase tracking-widest">More by the developer</span>
+                    <a href="https://viblify.pages.dev/" target="_blank" rel="noopener noreferrer" class="hover:text-accent">Viblify &#8599;</a>
+                    <a href="https://pikka.pages.dev/" target="_blank" rel="noopener noreferrer" class="hover:text-accent">Pikka &#8599;</a>
+                </nav>
+            </div>
+            <div class="border-t border-ink border-opacity-10 pt-6">
+                &copy; 2026 Quotia
+            </div>
+        </div>
     </footer>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.9.1/gsap.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.9.1/ScrollTrigger.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-core.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-clike.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-javascript.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-bash.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-python.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-json.min.js"></script>
     <script src="/static/js/script.js"></script>
 </body>
 </html>

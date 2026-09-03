@@ -141,10 +141,17 @@ body {
     line-clamp: 6;
     -webkit-box-orient: vertical;
     overflow: hidden;
+    margin-bottom: 1.75rem;
 }
 
-.quote-card__author {
+/* Author and the copy/share buttons share the bottom row. margin-top:auto pins
+   the row to the card's base so controls align across a row of cards. */
+.quote-card__footer {
     margin-top: auto;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    gap: 1rem;
 }
 
 .quote-actions {
@@ -189,9 +196,11 @@ body {
 
 /* Share menu. Colors are set explicitly so the menu stays legible while the
    parent card is inverted by .hover-invert. */
+/* Opens upward: the trigger sits on the card's bottom row, so a downward menu
+   would spill past the card edge. */
 .share-menu {
     position: absolute;
-    top: calc(100% + 0.4rem);
+    bottom: calc(100% + 0.4rem);
     right: 0;
     z-index: 40;
     min-width: 172px;

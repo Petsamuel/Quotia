@@ -304,13 +304,15 @@ function buildQuoteCard(quote) {
     const card = document.createElement('div');
     card.className = 'card quote-card p-6 md:p-8 border border-ink border-opacity-10 hover-invert';
 
-    const head = document.createElement('div');
-    head.className = 'flex justify-between items-start gap-4 mb-4';
-
     const text = document.createElement('p');
     text.className = 'font-mono text-sm quote-card__text';
     text.textContent = `“${quote.text}”`;
     text.title = quote.text;
+
+    // Author and actions share the bottom row, so the buttons sit clear of the
+    // quote text and every card's controls line up regardless of quote length.
+    const footer = document.createElement('div');
+    footer.className = 'quote-card__footer';
 
     const actions = document.createElement('div');
     actions.className = 'quote-actions';
@@ -346,15 +348,15 @@ function buildQuoteCard(quote) {
     actions.appendChild(shareButton);
     actions.appendChild(menu);
 
-    head.appendChild(text);
-    head.appendChild(actions);
-
     const author = document.createElement('h3');
     author.className = 'text-lg font-serif font-bold quote-card__author';
     author.textContent = quote.author;
 
-    card.appendChild(head);
-    card.appendChild(author);
+    footer.appendChild(author);
+    footer.appendChild(actions);
+
+    card.appendChild(text);
+    card.appendChild(footer);
     return card;
 }
 

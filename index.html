@@ -157,6 +157,43 @@
             </p>
         </section>
 
+        <section class="grid grid-cols-1 md:grid-cols-12 gap-8 mb-24 md:mb-32">
+            <div class="col-span-1 md:col-span-4">
+                <h2 class="text-3xl md:text-4xl font-serif font-bold reveal">Ready for AI agents</h2>
+            </div>
+            <div class="col-span-1 md:col-span-8">
+                <p class="text-base md:text-lg font-mono mb-8 reveal">
+                    Quotia speaks <span class="text-accent">MCP</span>. Point Claude, or any other
+                    MCP client, at one URL and it gets three typed tools with full schemas &mdash;
+                    no wrapper code, no glue, no key to configure.
+                </p>
+                <div class="code-block mb-8">
+                    <div class="code-block__bar">
+                        <span class="code-block__lang">bash</span>
+                        <button type="button" class="code-block__copy">Copy</button>
+                    </div>
+                    <pre class="code-block__body"><code class="language-bash">claude mcp add --transport http quotia https://api.quotia.io/mcp</code></pre>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-8 reveal-group">
+                    <div>
+                        <h3 class="font-mono text-sm font-bold mb-2 text-accent">search_quotes</h3>
+                        <p class="font-mono text-sm">Paged results, filtered by category.</p>
+                    </div>
+                    <div>
+                        <h3 class="font-mono text-sm font-bold mb-2 text-accent">random_quote</h3>
+                        <p class="font-mono text-sm">A single quote, ready to display.</p>
+                    </div>
+                    <div>
+                        <h3 class="font-mono text-sm font-bold mb-2 text-accent">list_categories</h3>
+                        <p class="font-mono text-sm">Valid categories, so the agent stops guessing.</p>
+                    </div>
+                </div>
+                <p class="font-mono text-sm mt-8">
+                    <a href="/quickstart#mcp" class="hover:text-accent border-b border-ink border-opacity-30">Connect an agent &rarr;</a>
+                </p>
+            </div>
+        </section>
+
         <section id="quotes-section" class="mb-24 md:mb-32">
             <div class="flex flex-col md:flex-row md:items-end md:justify-between gap-6 mb-8">
                 <h2 class="text-3xl md:text-4xl font-serif font-bold reveal">Live Quotes</h2>
@@ -213,6 +250,11 @@
                     <span class="opacity-50 uppercase tracking-widest">More by the developer</span>
                     <a href="https://viblify.pages.dev/" target="_blank" rel="noopener noreferrer" class="hover:text-accent">Viblify &#8599;</a>
                     <a href="https://pikka.pages.dev/" target="_blank" rel="noopener noreferrer" class="hover:text-accent">Pikka &#8599;</a>
+                </nav>
+                <nav class="flex flex-col gap-3">
+                    <span class="opacity-50 uppercase tracking-widest">Legal</span>
+                    <a href="/privacy" class="hover:text-accent">Privacy Policy</a>
+                    <a href="/terms" class="hover:text-accent">Terms of Service</a>
                 </nav>
                 <nav class="flex flex-col gap-3">
                     <span class="opacity-50 uppercase tracking-widest">Contact</span>

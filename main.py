@@ -38,6 +38,8 @@ HTML_PAGES = [
     ("/", "index.html", "1.0"),
     ("/quickstart", "quickstart.html", "0.9"),
     ("/pricing", "pricing.html", "0.9"),
+    ("/privacy", "privacy.html", "0.3"),
+    ("/terms", "terms.html", "0.3"),
 ]
 
 QUOTES_ENDPOINT = "/v1/quote"
@@ -307,10 +309,16 @@ for attribution.
   `quotes`, `category`, `page`, `page_size`, `total`, `total_pages`, `has_next`,
   `has_previous`. Each quote has `text`, `author`, `source`, `tags`.
 
+## MCP
+
+- [MCP server]({base_url}/mcp): Streamable HTTP endpoint exposing `search_quotes`,
+  `random_quote` and `list_categories` as typed tools. No authentication required.
+
 ## Docs
 
 - [Quickstart]({base_url}/quickstart): First request, every parameter, and the response shape.
 - [Pricing]({base_url}/pricing): Plans and limits.
+- [Privacy]({base_url}/privacy) and [Terms]({base_url}/terms): How data is handled and the terms of use.
 - [OpenAPI schema]({base_url}/openapi.json): Machine-readable specification of the API.
 - [ReDoc reference]({base_url}/redoc): Reference-style documentation.
 - [Swagger UI]({base_url}/docs): Interactive documentation you can send requests from.
@@ -404,9 +412,12 @@ Request: `GET {base_url}{QUOTES_ENDPOINT}?category=inspirational&page=1&page_siz
 
 ## Other endpoints
 
+- `POST /mcp` — MCP server (streamable HTTP). Tools: `search_quotes`, `random_quote`,
+  `list_categories`. No authentication.
 - `GET /` — landing page.
 - `GET /quickstart` — quickstart guide.
 - `GET /pricing` — plans and limits.
+- `GET /privacy`, `GET /terms` — privacy policy and terms of service.
 - `GET /docs` — Swagger UI.
 - `GET /redoc` — ReDoc reference. `/doc` and `/doc/` redirect here.
 - `GET /openapi.json` — OpenAPI schema.

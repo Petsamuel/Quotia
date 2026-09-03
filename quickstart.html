@@ -230,6 +230,82 @@ print(res.json()['quotes'])</code></pre>
             </div>
         </section>
 
+        <section id="mcp" class="mb-16 md:mb-24">
+            <h2 class="text-2xl md:text-3xl font-serif font-bold mb-6 reveal">Connect an AI agent (MCP)</h2>
+            <p class="font-mono text-sm max-w-3xl mb-8 reveal">
+                Quotia runs a Model Context Protocol server over streamable HTTP, so an agent can
+                call it directly instead of you writing a wrapper. Same data as the REST endpoint,
+                exposed as typed tools. No API key, no separate signup.
+            </p>
+
+            <div class="code-block mb-8">
+                <div class="code-block__bar">
+                    <span class="code-block__lang">endpoint</span>
+                    <button type="button" class="code-block__copy">Copy</button>
+                </div>
+                <pre class="code-block__body"><code>https://api.quotia.io/mcp</code></pre>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-8 reveal-group mb-8">
+                <div class="code-block">
+                    <div class="code-block__bar">
+                        <span class="code-block__lang">claude code</span>
+                        <button type="button" class="code-block__copy">Copy</button>
+                    </div>
+                    <pre class="code-block__body"><code class="language-bash">claude mcp add --transport http \
+  quotia https://api.quotia.io/mcp</code></pre>
+                </div>
+                <div class="code-block">
+                    <div class="code-block__bar">
+                        <span class="code-block__lang">json config</span>
+                        <button type="button" class="code-block__copy">Copy</button>
+                    </div>
+                    <pre class="code-block__body"><code class="language-json">{
+  "mcpServers": {
+    "quotia": {
+      "type": "http",
+      "url": "https://api.quotia.io/mcp"
+    }
+  }
+}</code></pre>
+                </div>
+            </div>
+
+            <h3 class="text-lg md:text-xl font-serif font-bold mb-4 reveal">Tools</h3>
+            <div class="overflow-x-auto border border-ink border-opacity-10 bg-white">
+                <table class="w-full font-mono text-sm">
+                    <thead>
+                        <tr class="border-b border-ink border-opacity-10 text-left">
+                            <th class="p-4 font-bold">Tool</th>
+                            <th class="p-4 font-bold">Arguments</th>
+                            <th class="p-4 font-bold">Returns</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr class="border-b border-ink border-opacity-10">
+                            <td class="p-4 text-accent">search_quotes</td>
+                            <td class="p-4"><code>category</code>, <code>page</code>, <code>page_size</code></td>
+                            <td class="p-4">A page of quotes plus <code>total</code>, <code>total_pages</code> and <code>has_next</code>.</td>
+                        </tr>
+                        <tr class="border-b border-ink border-opacity-10">
+                            <td class="p-4 text-accent">random_quote</td>
+                            <td class="p-4"><code>category</code></td>
+                            <td class="p-4">One quote with <code>text</code>, <code>author</code>, <code>source</code>, <code>tags</code>.</td>
+                        </tr>
+                        <tr>
+                            <td class="p-4 text-accent">list_categories</td>
+                            <td class="p-4">&mdash;</td>
+                            <td class="p-4">Category values known to return results.</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            <p class="font-mono text-sm mt-6 max-w-3xl">
+                Every tool advertises a full output schema, so the agent knows the shape of a result
+                before it calls &mdash; it does not have to parse prose or guess field names.
+            </p>
+        </section>
+
         <section class="text-center py-16 md:py-24">
             <h2 class="text-3xl md:text-5xl font-serif font-bold mb-8 reveal">Go deeper</h2>
             <div class="flex flex-col md:flex-row gap-4 justify-center font-mono text-sm reveal-group">
@@ -255,6 +331,11 @@ print(res.json()['quotes'])</code></pre>
                     <span class="opacity-50 uppercase tracking-widest">More by the developer</span>
                     <a href="https://viblify.pages.dev/" target="_blank" rel="noopener noreferrer" class="hover:text-accent">Viblify &#8599;</a>
                     <a href="https://pikka.pages.dev/" target="_blank" rel="noopener noreferrer" class="hover:text-accent">Pikka &#8599;</a>
+                </nav>
+                <nav class="flex flex-col gap-3">
+                    <span class="opacity-50 uppercase tracking-widest">Legal</span>
+                    <a href="/privacy" class="hover:text-accent">Privacy Policy</a>
+                    <a href="/terms" class="hover:text-accent">Terms of Service</a>
                 </nav>
                 <nav class="flex flex-col gap-3">
                     <span class="opacity-50 uppercase tracking-widest">Contact</span>

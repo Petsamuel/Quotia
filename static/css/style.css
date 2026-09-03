@@ -104,6 +104,63 @@ body {
     }
 }
 
+/* ---------- Legal pages ---------- */
+
+.legal h2 {
+    font-family: 'Playfair Display', serif;
+    font-weight: 700;
+    font-size: 1.5rem;
+    margin: 3rem 0 1rem;
+}
+
+.legal h2:first-child {
+    margin-top: 0;
+}
+
+.legal p,
+.legal li {
+    font-family: 'Space Mono', monospace;
+    font-size: 0.875rem;
+    line-height: 1.9;
+}
+
+.legal p {
+    margin-bottom: 1.1rem;
+}
+
+.legal ul {
+    list-style: none;
+    margin: 0 0 1.1rem;
+    padding: 0;
+}
+
+.legal li {
+    position: relative;
+    padding-left: 1.6rem;
+    margin-bottom: 0.6rem;
+}
+
+.legal li::before {
+    content: "—";
+    position: absolute;
+    left: 0;
+    color: var(--color-accent);
+}
+
+.legal a {
+    border-bottom: 1px solid rgba(5, 5, 5, 0.3);
+    transition: color 0.2s, border-color 0.2s;
+}
+
+.legal a:hover {
+    color: var(--color-accent);
+    border-color: var(--color-accent);
+}
+
+.legal strong {
+    font-weight: 700;
+}
+
 /* ---------- Quote cards & category filter ---------- */
 
 .quote-select {

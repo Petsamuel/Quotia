@@ -22,6 +22,7 @@ import logging
 import os
 import random
 from contextlib import asynccontextmanager
+from datetime import date as date_type, datetime, timezone
 from functools import lru_cache
 from math import ceil
 from pathlib import Path
@@ -794,17 +795,39 @@ async def get_daily_crossword(
         le=crossword.MAX_SIZE,
         description=f"Grid width and height ({crossword.MIN_SIZE}-{crossword.MAX_SIZE}).",
     ),
+    puzzle_date: Optional[str] = Query(
+        None,
+        alias="date",
+        description=(
+            "UTC date as `YYYY-MM-DD` to fetch a past puzzle. Defaults to today. "
+            "Future dates are rejected so nobody can read tomorrow's answers early."
+        ),
+        examples=["2026-09-02"],
+    ),
 ) -> Dict[str, Any]:
     """
     The puzzle of the day — the same grid for every caller until UTC midnight.
 
-    The seed is derived from today's UTC date, so you can run a daily puzzle
-    where everyone plays the same board without storing anything. The theme
-    rotates with the date. The response adds a `date` field; everything else
-    matches `GET /v1/crossword`.
+    The seed is derived from the UTC date, so you can run a daily puzzle where
+    everyone plays the same board without storing anything. The theme rotates
+    with the date. The response adds a `date` field; everything else matches
+    `GET /v1/crossword`.
+
+    Pass `date` to replay a past day, which is how yesterday's solution is shown
+    once its day is over. Future dates return 400 — publishing tomorrow's grid
+    on request would let anyone skip ahead.
     """
+    day = None
+    if puzzle_date:
+        try:
+            day = date_type.fromisoformat(puzzle_date)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="date must be in YYYY-MM-DD form.")
+        if day > datetime.now(timezone.utc).date():
+            raise HTTPException(status_code=400, detail="Future puzzles are not available.")
+
     try:
-        return crossword.generate_daily(size=size)
+        return crossword.generate_daily(size=size, day=day)
     except Exception as e:
         logger.error(f"Error generating daily crossword: {str(e)}")
         raise HTTPException(status_code=500, detail="Internal server error")

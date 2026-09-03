@@ -1,0 +1,52 @@
+<!doctype html><meta charset="utf-8">
+<link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+<link rel="stylesheet" href="/static/css/style.css">
+<body class="bg-stone-100 text-ink">
+<h2 id="cw-title"></h2><p id="cw-meta"></p>
+<button id="cw-hint">Hint</button><button id="cw-check">Check</button>
+<button id="cw-options" aria-expanded="false">More</button>
+<section id="cw-options-panel" hidden>
+  <select id="cw-category"><option value="" selected></option><option value="animals">animals</option></select>
+  <select id="cw-size"><option value="11" selected>11</option></select>
+  <button id="cw-new">Practice</button><button id="cw-daily">Today</button>
+  <button id="cw-yesterday">Yesterday</button><button id="cw-clear">Clear</button>
+  <span id="cw-seed"></span>
+</section>
+<div id="cw-grid" class="cw-grid"></div>
+<div class="cw-cluebar"><button id="cw-prev">P</button><p id="cw-current-clue"></p><button id="cw-next">N</button></div>
+<p id="cw-status"></p><ol id="cw-across"></ol><ol id="cw-down"></ol>
+<pre id="out" style="font:12px monospace;white-space:pre-wrap"></pre>
+<script src="/static/js/crossword.js"></script>
+<script>
+const log = m => { document.getElementById('out').textContent += m + "\n"; };
+const g = id => document.getElementById(id);
+setTimeout(() => {
+  try {
+    log('Reveal button exists: ' + Boolean(g('cw-reveal')) + '   (should be false)');
+    log('options panel hidden by default: ' + g('cw-options-panel').hasAttribute('hidden'));
+    log('title: ' + g('cw-title').textContent);
+    log('meta : ' + g('cw-meta').textContent);
+    log('seed : ' + g('cw-seed').textContent);
+
+    const before = [...document.querySelectorAll('.cw-cell__input')].filter(x => x.value).length;
+    g('cw-hint').click();
+    const after = [...document.querySelectorAll('.cw-cell__input')].filter(x => x.value).length;
+    log('hint adds exactly one letter: ' + (after === before + 1)
+        + ' | marked is-hinted: ' + (document.querySelectorAll('.cw-cell.is-hinted').length === 1));
+    log('hint status: ' + g('cw-status').textContent);
+
+    g('cw-options').click();
+    log('More toggles panel open: ' + !g('cw-options-panel').hasAttribute('hidden')
+        + ' | label: ' + g('cw-options').textContent.trim());
+
+    g('cw-yesterday').click();
+    setTimeout(() => {
+      log('yesterday title: ' + g('cw-title').textContent);
+      log('  every cell filled: ' + [...document.querySelectorAll('.cw-cell__input')].every(x => x.value));
+      log('  readonly: ' + [...document.querySelectorAll('.cw-cell__input')].every(x => x.readOnly));
+      log('  hint disabled: ' + g('cw-hint').disabled + ' check disabled: ' + g('cw-check').disabled);
+      log('RESULT: OK');
+    }, 3000);
+  } catch (e) { log('FAILED: ' + e.message); }
+}, 3500);
+</script>

@@ -82,38 +82,51 @@
             </p>
         </section>
 
-        <section class="flex flex-wrap items-center gap-3 mb-10 font-mono text-sm">
-            <label for="cw-category" class="opacity-60">Theme</label>
-            <select id="cw-category" class="quote-select">
-                <option value="">Mixed</option>
-                <option value="animals">Animals</option>
-                <option value="food">Food</option>
-                <option value="geography">Geography</option>
-                <option value="music">Music</option>
-                <option value="science">Science</option>
-                <option value="sports">Sports</option>
-            </select>
+        <section class="cw-topbar mb-8">
+            <div class="cw-topbar__title">
+                <h2 id="cw-title" class="cw-topbar__heading">Today's puzzle</h2>
+                <p id="cw-meta" class="cw-topbar__meta"></p>
+            </div>
 
-            <label for="cw-size" class="opacity-60 ml-2">Size</label>
-            <select id="cw-size" class="quote-select">
-                <option value="9">9 × 9</option>
-                <option value="11" selected>11 × 11</option>
-                <option value="13">13 × 13</option>
-                <option value="15">15 × 15</option>
-            </select>
+            <div class="cw-topbar__actions">
+                <button type="button" id="cw-hint" class="cw-btn cw-btn--primary">Hint</button>
+                <button type="button" id="cw-check" class="cw-btn">Check</button>
+                <button type="button" id="cw-options" class="cw-btn cw-btn--quiet" aria-expanded="false" aria-controls="cw-options-panel">
+                    More
+                </button>
+            </div>
+        </section>
 
-            <button type="button" id="cw-new" class="quote-shuffle ml-2">
-                <svg class="quote-shuffle__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 3h5v5"/><path d="M4 20 21 3"/><path d="M21 16v5h-5"/><path d="m15 15 6 6"/><path d="m4 4 5 5"/></svg>
-                <span>New puzzle</span>
-            </button>
+        <!-- Everything below is opt-in: someone who just wants to play never opens it. -->
+        <section id="cw-options-panel" class="cw-options" hidden>
+            <div class="cw-options__row">
+                <label for="cw-category" class="cw-options__label">Theme</label>
+                <select id="cw-category" class="quote-select">
+                    <option value="">Mixed</option>
+                    <option value="animals">Animals</option>
+                    <option value="food">Food</option>
+                    <option value="geography">Geography</option>
+                    <option value="music">Music</option>
+                    <option value="science">Science</option>
+                    <option value="sports">Sports</option>
+                </select>
 
-            <button type="button" id="cw-daily" class="quote-shuffle">
-                <svg class="quote-shuffle__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>
-                <span>Today's puzzle</span>
-            </button>
+                <label for="cw-size" class="cw-options__label">Size</label>
+                <select id="cw-size" class="quote-select">
+                    <option value="9">9 × 9</option>
+                    <option value="11" selected>11 × 11</option>
+                    <option value="13">13 × 13</option>
+                    <option value="15">15 × 15</option>
+                </select>
+            </div>
 
-            <span id="cw-meta" class="opacity-50 ml-auto"></span>
-            <span id="cw-seed" class="opacity-50"></span>
+            <div class="cw-options__row">
+                <button type="button" id="cw-new" class="cw-btn">Practice puzzle</button>
+                <button type="button" id="cw-daily" class="cw-btn">Back to today</button>
+                <button type="button" id="cw-yesterday" class="cw-btn">Yesterday's answers</button>
+                <button type="button" id="cw-clear" class="cw-btn cw-btn--quiet">Clear grid</button>
+                <span id="cw-seed" class="cw-options__seed"></span>
+            </div>
         </section>
 
         <div class="cw-layout mb-16">
@@ -124,12 +137,6 @@
                     <button type="button" id="cw-prev" aria-label="Previous clue">&larr;</button>
                     <p id="cw-current-clue">Loading a puzzle&hellip;</p>
                     <button type="button" id="cw-next" aria-label="Next clue">&rarr;</button>
-                </div>
-
-                <div class="cw-actions">
-                    <button type="button" id="cw-check">Check</button>
-                    <button type="button" id="cw-reveal">Reveal</button>
-                    <button type="button" id="cw-clear">Clear</button>
                 </div>
 
                 <p id="cw-status" class="cw-status" role="status" aria-live="polite"></p>

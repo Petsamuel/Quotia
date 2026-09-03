@@ -13,6 +13,8 @@ const state = {
     direction: 'across',
     cursor: null,             // "r,c"
     revealed: false,
+    hints: new Set(),         // cells filled by the Hint button
+    mode: 'daily',            // 'daily' | 'custom' | 'past'
 };
 
 const key = (r, c) => `${r},${c}`;
@@ -53,6 +55,7 @@ function saveProgress() {
             category: state.puzzle.category || '',
             daily: Boolean(state.puzzle.date),
             revealed: state.revealed,
+            hints: Array.from(state.hints),
             letters,
         }));
     } catch (error) {
@@ -64,15 +67,18 @@ function restoreProgress() {
     const saved = readSaved();
     if (!saved || saved.id !== puzzleId(state.puzzle)) return 0;
 
+    const hints = new Set(saved.hints || []);
     let restored = 0;
     Object.entries(saved.letters || {}).forEach(([k, letter]) => {
         const input = state.inputs.get(k);
         if (!input) return;
         input.value = letter;
         if (saved.revealed) input.parentElement.classList.add('is-revealed');
+        else if (hints.has(k)) input.parentElement.classList.add('is-hinted');
         restored += 1;
     });
     state.revealed = Boolean(saved.revealed);
+    state.hints = hints;
     return restored;
 }
 
@@ -307,24 +313,69 @@ function checkAnswers() {
         : `${wrong} wrong, ${blank} still empty.`);
 }
 
-function revealAll() {
+/* One letter at a time, never the whole grid. On a daily puzzle everyone is
+   solving the same board, so a reveal button would just hand out the answers;
+   past days are shown solved instead, once they can no longer be spoiled. */
+function giveHint() {
+    if (!state.puzzle) return;
+
+    const solutionAt = k => {
+        const [r, c] = k.split(',').map(Number);
+        return state.puzzle.solution[r][c];
+    };
+
+    // Prefer the square you're on, then the rest of the current word, then anywhere.
+    const candidates = [];
+    if (state.cursor && !state.inputs.get(state.cursor).value) candidates.push(state.cursor);
+
+    const entry = currentEntry();
+    if (entry) {
+        entryCells(entry).forEach(k => {
+            const input = state.inputs.get(k);
+            if (input && input.value !== solutionAt(k)) candidates.push(k);
+        });
+    }
+    state.inputs.forEach((input, k) => {
+        if (input.value !== solutionAt(k)) candidates.push(k);
+    });
+
+    const target = candidates.find(Boolean);
+    if (!target) {
+        setStatus('Nothing left to fill in.');
+        return;
+    }
+
+    const input = state.inputs.get(target);
+    input.value = solutionAt(target);
+    input.parentElement.classList.remove('is-wrong');
+    input.parentElement.classList.add('is-hinted');
+    state.hints.add(target);
+
+    saveProgress();
+    setStatus(`Hint used — ${state.hints.size} so far.`);
+    checkComplete();
+}
+
+/* Fill in a past day's grid. Only reachable for dates already gone; the API
+   rejects future dates, so this cannot be used to skip ahead. */
+function showSolution() {
     state.inputs.forEach((input, k) => {
         const [r, c] = k.split(',').map(Number);
         input.value = state.puzzle.solution[r][c];
-        input.parentElement.classList.remove('is-wrong');
+        input.parentElement.classList.remove('is-wrong', 'is-hinted');
         input.parentElement.classList.add('is-revealed');
+        input.readOnly = true;
     });
     state.revealed = true;
-    saveProgress();
-    setStatus('Solution revealed.');
 }
 
 function clearGrid() {
     state.inputs.forEach(input => {
         input.value = '';
-        input.parentElement.classList.remove('is-wrong', 'is-revealed');
+        input.parentElement.classList.remove('is-wrong', 'is-revealed', 'is-hinted');
     });
     state.revealed = false;
+    state.hints = new Set();
     saveProgress();
     setStatus('');
 }
@@ -342,16 +393,15 @@ function setStatus(message) {
     el('cw-status').textContent = message;
 }
 
-async function loadPuzzle({ category, size, seed, daily = false } = {}) {
+async function loadPuzzle({ category, size, seed, daily = false, date = null } = {}) {
     const grid = el('cw-grid');
-    const button = el(daily ? 'cw-daily' : 'cw-new');
-    button.disabled = true;
-    button.classList.add('is-loading');
     setStatus('');
 
     const params = new URLSearchParams();
     if (size) params.set('size', size);
-    if (!daily) {
+    if (daily) {
+        if (date) params.set('date', date);
+    } else {
         if (category) params.set('category', category);
         if (seed) params.set('seed', seed);
     }
@@ -367,17 +417,30 @@ async function loadPuzzle({ category, size, seed, daily = false } = {}) {
         state.direction = 'across';
         state.cursor = null;
         state.revealed = false;
+        state.hints = new Set();
+
+        const today = new Date().toISOString().slice(0, 10);
+        const isPast = Boolean(data.date && data.date < today);
+        state.mode = daily ? (isPast ? 'past' : 'daily') : 'custom';
 
         buildGrid();
         buildClueLists();
 
-        const restored = restoreProgress();
-        if (restored) {
-            setStatus(`Picked up where you left off — ${restored} letter${restored === 1 ? '' : 's'} restored.`);
+        if (state.mode === 'past') {
+            // The day is over, so the answers can't spoil anyone's puzzle.
+            showSolution();
+            setStatus(`Answers for ${data.date}.`);
         } else {
-            // Record the new puzzle's identity so the next refresh returns it.
-            saveProgress();
+            const restored = restoreProgress();
+            if (restored) {
+                setStatus(`Picked up where you left off — ${restored} letter${restored === 1 ? '' : 's'} restored.`);
+            } else {
+                // Record the new puzzle's identity so the next refresh returns it.
+                saveProgress();
+            }
         }
+
+        applyMode(data);
 
         const first = data.across[0] || data.down[0];
         if (first) {
@@ -387,8 +450,6 @@ async function loadPuzzle({ category, size, seed, daily = false } = {}) {
         render();
 
         el('cw-seed').textContent = data.date ? `daily · ${data.date}` : `seed ${data.seed}`;
-        el('cw-meta').textContent = `${data.word_count} words · ${data.size}×${data.size}`
-            + (data.category ? ` · ${data.category}` : '');
         if (data.category && el('cw-category').value !== data.category) {
             // The daily puzzle picks its own theme; reflect it in the control.
             el('cw-category').value = data.category;
@@ -397,10 +458,35 @@ async function loadPuzzle({ category, size, seed, daily = false } = {}) {
         console.error('Crossword load failed:', error);
         grid.innerHTML = '';
         setStatus('Could not load a puzzle. Try again.');
-    } finally {
-        button.disabled = false;
-        button.classList.remove('is-loading');
     }
+}
+
+function formatDay(iso) {
+    const parsed = new Date(`${iso}T00:00:00Z`);
+    if (Number.isNaN(parsed.getTime())) return iso;
+    return parsed.toLocaleDateString(undefined, {
+        weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC',
+    });
+}
+
+// Heading, meta line and which buttons make sense all follow from the mode.
+function applyMode(data) {
+    const titles = {
+        daily: "Today's puzzle",
+        past: `Answers · ${data.date ? formatDay(data.date) : ''}`,
+        custom: 'Practice puzzle',
+    };
+    el('cw-title').textContent = titles[state.mode];
+
+    const bits = [`${data.word_count} words`, `${data.size}×${data.size}`];
+    if (data.category) bits.push(data.category);
+    if (state.mode === 'daily' && data.date) bits.unshift(formatDay(data.date));
+    el('cw-meta').textContent = bits.join(' · ');
+
+    const solved = state.mode === 'past';
+    el('cw-hint').disabled = solved;
+    el('cw-check').disabled = solved;
+    el('cw-clear').disabled = solved;
 }
 
 function currentOptions() {
@@ -415,11 +501,24 @@ document.addEventListener('DOMContentLoaded', () => {
 
     el('cw-new').addEventListener('click', () => loadPuzzle(currentOptions()));
     el('cw-daily').addEventListener('click', () => loadPuzzle({ ...currentOptions(), daily: true }));
+    el('cw-yesterday').addEventListener('click', () => {
+        const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+        loadPuzzle({ ...currentOptions(), daily: true, date: yesterday });
+    });
     el('cw-category').addEventListener('change', () => loadPuzzle(currentOptions()));
     el('cw-size').addEventListener('change', () => loadPuzzle(currentOptions()));
+    el('cw-hint').addEventListener('click', giveHint);
     el('cw-check').addEventListener('click', checkAnswers);
-    el('cw-reveal').addEventListener('click', revealAll);
     el('cw-clear').addEventListener('click', clearGrid);
+
+    const optionsButton = el('cw-options');
+    const optionsPanel = el('cw-options-panel');
+    optionsButton.addEventListener('click', () => {
+        const open = optionsPanel.hasAttribute('hidden');
+        optionsPanel.toggleAttribute('hidden', !open);
+        optionsButton.setAttribute('aria-expanded', String(open));
+        optionsButton.textContent = open ? 'Less' : 'More';
+    });
 
     el('cw-prev').addEventListener('click', () => moveEntry(-1));
     el('cw-next').addEventListener('click', () => moveEntry(1));
@@ -447,7 +546,8 @@ document.addEventListener('DOMContentLoaded', () => {
         return;
     }
 
-    loadPuzzle(currentOptions());
+    // Default to today's puzzle: someone arriving cold should just be able to play.
+    loadPuzzle({ ...currentOptions(), daily: true });
 });
 
 function moveEntry(delta) {

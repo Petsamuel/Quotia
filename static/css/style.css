@@ -45,15 +45,19 @@ body {
     border-color: var(--color-text);
 }
 
+/* difference blending inverts the cursor against whatever is behind it: it
+   renders near-black on the cream background and white over dark code blocks,
+   with no scroll tracking needed. */
 .cursor {
     width: 20px;
     height: 20px;
-    border: 1px solid var(--color-text);
+    border: 1px solid #fff;
     border-radius: 50%;
     position: fixed;
     pointer-events: none;
     transform: translate(-50%, -50%);
     transition: width 0.2s, height 0.2s;
+    mix-blend-mode: difference;
     z-index: 9999;
 }
 
@@ -102,6 +106,31 @@ body {
         opacity: 1;
         transform: none;
     }
+}
+
+/* ---------- Fixed header over dark content ----------
+   script.js measures the background behind the header and adds .is-over-dark
+   when a dark surface (a code block, say) scrolls underneath. */
+
+header nav a,
+header .logo img {
+    transition: color 0.25s, filter 0.25s;
+}
+
+header nav.is-over-dark a {
+    color: var(--color-background);
+}
+
+/* Keep the accent colour for the active link and on hover — it reads fine on
+   both grounds, and this rule must outrank the flip above. */
+header nav.is-over-dark a.text-accent,
+header nav.is-over-dark a:hover {
+    color: var(--color-accent);
+}
+
+/* brightness(0) first, so the red accent dot goes white too rather than cyan. */
+header .logo.is-over-dark img {
+    filter: brightness(0) invert(1);
 }
 
 /* ---------- Footer watermark ---------- */

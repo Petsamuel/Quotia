@@ -4,8 +4,69 @@ document.addEventListener('DOMContentLoaded', () => {
     initCopyButtons();
     initCategoryFilter();
     initShuffle();
+    initHeaderContrast();
     loadQuotes();
 });
+
+/* The header is fixed and transparent, so ink-coloured links vanish when a dark
+   code block scrolls underneath. Rather than hardcoding which sections are dark,
+   sample the real background colour behind the header and flip to light when it
+   is. That way any future dark surface is handled without touching this code. */
+function initHeaderContrast() {
+    const header = document.querySelector('header');
+    if (!header) return;
+
+    const nav = header.querySelector('nav');
+    const logo = header.querySelector('.logo');
+    if (!nav && !logo) return;
+
+    const DARK_THRESHOLD = 110; // 0-255 perceived luminance
+
+    function luminanceBehind(element) {
+        const rect = element.getBoundingClientRect();
+        if (!rect.width) return 255;
+
+        const y = rect.top + rect.height / 2;
+        const samples = [rect.left + 2, (rect.left + rect.right) / 2, rect.right - 2];
+        let darkest = 255;
+
+        samples.forEach(x => {
+            for (const node of document.elementsFromPoint(x, y)) {
+                if (header.contains(node)) continue; // ignore the header itself
+                const match = window.getComputedStyle(node).backgroundColor
+                    .match(/^rgba?\(([^)]+)\)$/);
+                if (!match) continue;
+
+                const parts = match[1].split(',').map(parseFloat);
+                const alpha = parts.length > 3 ? parts[3] : 1;
+                if (alpha < 0.5) continue; // see through to whatever is below
+
+                const luminance = 0.299 * parts[0] + 0.587 * parts[1] + 0.114 * parts[2];
+                darkest = Math.min(darkest, luminance);
+                break; // first opaque layer wins for this sample
+            }
+        });
+
+        return darkest;
+    }
+
+    let queued = false;
+    function update() {
+        queued = false;
+        if (nav) nav.classList.toggle('is-over-dark', luminanceBehind(nav) < DARK_THRESHOLD);
+        if (logo) logo.classList.toggle('is-over-dark', luminanceBehind(logo) < DARK_THRESHOLD);
+    }
+
+    function schedule() {
+        if (queued) return;
+        queued = true;
+        requestAnimationFrame(update);
+    }
+
+    window.addEventListener('scroll', schedule, { passive: true });
+    window.addEventListener('resize', schedule);
+    update();
+}
 
 function initCopyButtons() {
     document.querySelectorAll('.code-block__copy').forEach(button => {
@@ -226,15 +287,54 @@ async function renderQuoteImage(quote) {
     ctx.font = `bold 40px "Playfair Display", Georgia, serif`;
     ctx.fillText(quote.author, PAD, y + 84);
 
-    ctx.font = `22px "Space Mono", monospace`;
-    ctx.fillStyle = 'rgba(5,5,5,0.55)';
-    ctx.fillText('quotia.io', PAD, SIZE - PAD + 24);
+    drawBrandmark(ctx, PAD, SIZE - PAD + 12);
+
     if (quote.source) {
+        ctx.font = `22px "Space Mono", monospace`;
+        ctx.fillStyle = 'rgba(5,5,5,0.45)';
         const attribution = `via ${quote.source}`;
-        ctx.fillText(attribution, SIZE - PAD - ctx.measureText(attribution).width, SIZE - PAD + 24);
+        ctx.fillText(attribution, SIZE - PAD - ctx.measureText(attribution).width, SIZE - PAD + 20);
     }
 
     return new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+}
+
+// Redraws static/assets/logo.svg with canvas primitives rather than loading the
+// file — an <img> from disk would taint the canvas and break toBlob().
+function drawLogoMark(ctx, cx, cy, radius) {
+    const scale = radius / 19.5; // logo.svg outer circle is r=19.5 in a 40x40 box
+
+    ctx.save();
+    ctx.strokeStyle = '#050505';
+    ctx.lineWidth = Math.max(1, 1 * scale);
+
+    ctx.beginPath();
+    ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.arc(cx, cy, 10 * scale, 0, Math.PI * 2);
+    ctx.stroke();
+
+    // The accent dot sits at (28,12) in a circle centred on (20,20).
+    ctx.fillStyle = '#FF3333';
+    ctx.beginPath();
+    ctx.arc(cx + 8 * scale, cy - 8 * scale, 2 * scale, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+}
+
+function drawBrandmark(ctx, x, baseline) {
+    const radius = 15;
+    ctx.save();
+    ctx.globalAlpha = 0.6;
+    drawLogoMark(ctx, x + radius, baseline - 8, radius);
+
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = 'rgba(5,5,5,0.7)';
+    ctx.font = `bold 30px "Playfair Display", Georgia, serif`;
+    ctx.fillText('Quotia', x + radius * 2 + 14, baseline);
+    ctx.restore();
 }
 
 function quoteFileName(quote) {

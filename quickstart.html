@@ -74,6 +74,7 @@
             <img src="/static/assets/logo.svg" alt="Quotia" class="h-6 md:h-8">
         </a>
         <nav class="flex gap-4 md:gap-8 font-mono text-xs md:text-sm">
+            <a href="/crossword" class="hover:text-accent">Crossword</a>
             <a href="/quickstart" class="text-accent">Quickstart</a>
             <a href="/pricing" class="hover:text-accent">Pricing</a>
             <a href="/docs" class="hover:text-accent">Docs</a>
@@ -230,6 +231,94 @@ print(res.json()['quotes'])</code></pre>
             </div>
         </section>
 
+        <section id="crossword" class="mb-16 md:mb-24">
+            <h2 class="text-2xl md:text-3xl font-serif font-bold mb-6 reveal">Crossword puzzles</h2>
+            <p class="font-mono text-sm max-w-3xl mb-8 reveal">
+                <code>/v1/crossword</code> returns a complete puzzle: a blank grid, the solution,
+                and numbered across/down clues with their grid coordinates. Words interlock
+                criss-cross style. Puzzles are built from a word bank bundled with the API, so the
+                endpoint makes no upstream request and answers in milliseconds.
+            </p>
+
+            <div class="code-block mb-8">
+                <div class="code-block__bar">
+                    <span class="code-block__lang">bash</span>
+                    <button type="button" class="code-block__copy">Copy</button>
+                </div>
+                <pre class="code-block__body"><code class="language-bash">curl "https://api.quotia.io/v1/crossword?category=animals&amp;size=11"</code></pre>
+            </div>
+
+            <div class="overflow-x-auto border border-ink border-opacity-10 bg-white mb-8">
+                <table class="w-full font-mono text-sm">
+                    <thead>
+                        <tr class="border-b border-ink border-opacity-10 text-left">
+                            <th class="p-4 font-bold">Parameter</th>
+                            <th class="p-4 font-bold">Type</th>
+                            <th class="p-4 font-bold">Default</th>
+                            <th class="p-4 font-bold">Description</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr class="border-b border-ink border-opacity-10">
+                            <td class="p-4 text-accent">category</td>
+                            <td class="p-4">string</td>
+                            <td class="p-4">&mdash;</td>
+                            <td class="p-4">One of <code>animals</code>, <code>food</code>, <code>geography</code>, <code>music</code>, <code>science</code>, <code>sports</code>. Omit to mix all.</td>
+                        </tr>
+                        <tr class="border-b border-ink border-opacity-10">
+                            <td class="p-4 text-accent">size</td>
+                            <td class="p-4">integer</td>
+                            <td class="p-4">11</td>
+                            <td class="p-4">Grid width and height, 7 to 21.</td>
+                        </tr>
+                        <tr class="border-b border-ink border-opacity-10">
+                            <td class="p-4 text-accent">word_count</td>
+                            <td class="p-4">integer</td>
+                            <td class="p-4">~size</td>
+                            <td class="p-4">How many words to aim for, 4 to 40.</td>
+                        </tr>
+                        <tr>
+                            <td class="p-4 text-accent">seed</td>
+                            <td class="p-4">integer</td>
+                            <td class="p-4">random</td>
+                            <td class="p-4">Reuse a seed to regenerate that exact puzzle.</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="code-block mb-8">
+                <div class="code-block__bar">
+                    <span class="code-block__lang">json</span>
+                    <button type="button" class="code-block__copy">Copy</button>
+                </div>
+                <pre class="code-block__body"><code class="language-json">{
+  "category": "animals",
+  "size": 11,
+  "seed": 4242,
+  "word_count": 11,
+  "puzzle":   [["#","#","","#", "..."], "..."],
+  "solution": [["#","#","M","#", "..."], "..."],
+  "across": [
+    { "number": 4, "clue": "Flightless bird in a tuxedo",
+      "answer": "PENGUIN", "row": 3, "col": 1, "length": 7 }
+  ],
+  "down": [
+    { "number": 1, "clue": "Tunnel digger",
+      "answer": "MOLE", "row": 0, "col": 2, "length": 4 }
+  ]
+}</code></pre>
+            </div>
+
+            <p class="font-mono text-sm max-w-3xl">
+                In both grids <code>"#"</code> is a blank cell. In <code>puzzle</code> an empty
+                string is a square the player fills in; <code>solution</code> holds the letters.
+                Render <code>puzzle</code> and keep <code>solution</code> on your side.
+                <code>seed</code> makes generation reproducible &mdash; store it and you can serve
+                the same grid to everyone, or rebuild a puzzle you have already scored.
+            </p>
+        </section>
+
         <section id="mcp" class="mb-16 md:mb-24">
             <h2 class="text-2xl md:text-3xl font-serif font-bold mb-6 reveal">Connect an AI agent (MCP)</h2>
             <p class="font-mono text-sm max-w-3xl mb-8 reveal">
@@ -292,10 +381,20 @@ print(res.json()['quotes'])</code></pre>
                             <td class="p-4"><code>category</code></td>
                             <td class="p-4">One quote with <code>text</code>, <code>author</code>, <code>source</code>, <code>tags</code>.</td>
                         </tr>
-                        <tr>
+                        <tr class="border-b border-ink border-opacity-10">
                             <td class="p-4 text-accent">list_categories</td>
                             <td class="p-4">&mdash;</td>
-                            <td class="p-4">Category values known to return results.</td>
+                            <td class="p-4">Quote category values known to return results.</td>
+                        </tr>
+                        <tr class="border-b border-ink border-opacity-10">
+                            <td class="p-4 text-accent">generate_crossword</td>
+                            <td class="p-4"><code>category</code>, <code>size</code>, <code>word_count</code>, <code>seed</code></td>
+                            <td class="p-4">A full puzzle: grid, solution and numbered clues.</td>
+                        </tr>
+                        <tr>
+                            <td class="p-4 text-accent">list_crossword_categories</td>
+                            <td class="p-4">&mdash;</td>
+                            <td class="p-4">Categories the crossword generator can theme on.</td>
                         </tr>
                     </tbody>
                 </table>
@@ -326,6 +425,7 @@ print(res.json()['quotes'])</code></pre>
             <div class="flex flex-col md:flex-row gap-10 md:gap-24 mb-12">
                 <nav class="flex flex-col gap-3">
                     <span class="opacity-50 uppercase tracking-widest">Quotia</span>
+                    <a href="/crossword" class="hover:text-accent">Crossword</a>
                     <a href="/quickstart" class="hover:text-accent">Quickstart</a>
                     <a href="/pricing" class="hover:text-accent">Pricing</a>
                     <a href="/docs" class="hover:text-accent">Docs</a>

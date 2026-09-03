@@ -17,6 +17,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from mcp.server.mcpserver import MCPServer
 from mcp.server.transport_security import TransportSecuritySettings
+import crossword
 import logging
 import os
 import random
@@ -36,6 +37,7 @@ STATIC_DIR = BASE_DIR / "static"
 # plain file rendered through render_page() so its SEO tags get the real origin.
 HTML_PAGES = [
     ("/", "index.html", "1.0"),
+    ("/crossword", "crossword.html", "0.9"),
     ("/quickstart", "quickstart.html", "0.9"),
     ("/pricing", "pricing.html", "0.9"),
     ("/privacy", "privacy.html", "0.3"),
@@ -43,6 +45,7 @@ HTML_PAGES = [
 ]
 
 QUOTES_ENDPOINT = "/v1/quote"
+CROSSWORD_ENDPOINT = "/v1/crossword"
 
 # Absolute URLs in canonical tags, Open Graph, sitemap.xml and llms.txt must point
 # at the real public origin. Set QUOTIA_BASE_URL in production (e.g. behind a proxy
@@ -78,10 +81,14 @@ KNOWN_CATEGORIES = [
 ]
 
 DESCRIPTION = """
-A quote API for developers. One endpoint returns quotes as clean, paginated JSON,
-filterable by category.
+A words API for developers. Quotes as clean, paginated JSON, and generated
+crossword puzzles — both filterable by category.
 
-`GET /v1/quote` is the API. The site root `/` serves the landing page.
+* `GET /v1/quote` — quotes, collected live and paginated.
+* `GET /v1/crossword` — a playable crossword, generated in memory from a bundled
+  word bank. Deterministic for a given `seed`, and makes no upstream request.
+
+The site root `/` serves the landing page.
 
 ## Attribution
 
@@ -114,6 +121,10 @@ TAGS_METADATA = [
     {
         "name": "quotes",
         "description": "Fetch quotes as paginated JSON, optionally filtered by category.",
+    },
+    {
+        "name": "crossword",
+        "description": "Generate playable crossword puzzles from a bundled word bank.",
     },
 ]
 
@@ -199,6 +210,42 @@ class CategoryList(BaseModel):
     """The set of category values known to return results."""
 
     categories: List[str] = Field(..., description="Category values that can be passed as `category`.")
+
+
+class CrosswordEntry(BaseModel):
+    """One numbered clue in a puzzle."""
+
+    number: int = Field(..., description="Clue number, shared with any entry starting in the same cell.")
+    clue: str = Field(..., description="The clue text.")
+    answer: str = Field(..., description="The answer, uppercase.")
+    row: int = Field(..., description="0-based row of the entry's first letter.")
+    col: int = Field(..., description="0-based column of the entry's first letter.")
+    length: int = Field(..., description="Number of letters in the answer.")
+
+
+class CrosswordPuzzle(BaseModel):
+    """A generated crossword: the blank grid, the solution, and numbered clues."""
+
+    category: Optional[str] = Field(None, description="Category the words came from, or `null` for a mix.")
+    size: int = Field(..., description="Width and height of the square grid.")
+    seed: int = Field(..., description="Pass this back as `seed` to regenerate this exact puzzle.")
+    word_count: int = Field(..., description="How many words were interlocked into the grid.")
+    puzzle: List[List[str]] = Field(
+        ...,
+        description='Grid to solve: "#" is a blank cell, "" is a letter to fill in.',
+    )
+    solution: List[List[str]] = Field(
+        ...,
+        description='Solved grid: "#" is a blank cell, otherwise the uppercase letter.',
+    )
+    across: List[CrosswordEntry] = Field(..., description="Across clues, in numbered order.")
+    down: List[CrosswordEntry] = Field(..., description="Down clues, in numbered order.")
+
+
+class DailyCrossword(CrosswordPuzzle):
+    """The puzzle of the day, identical for every caller until UTC midnight."""
+
+    date: str = Field(..., description="UTC date this puzzle belongs to, as YYYY-MM-DD.")
 
 # Initialize cache immediately
 FastAPICache.init(InMemoryBackend(), prefix="fastapi-cache")
@@ -292,10 +339,10 @@ async def llms_txt(request: Request) -> PlainTextResponse:
     base_url = resolve_base_url(request)
     body = f"""# Quotia
 
-> A developer-friendly quote API. One endpoint returns quotes as clean, paginated
-> JSON, filterable by category.
+> A developer-friendly words API: quotes as clean, paginated JSON, and generated
+> crossword puzzles. Both filterable by category, neither needing an API key.
 
-Quotia exposes one endpoint and requires no authentication or API key. Quotes are
+Quotia requires no authentication or API key. Quotes are
 collected live from public quote sites and cached in memory for 5 minutes. Because
 results are collected per request, `total` reflects what was retrieved for that
 request rather than a fixed catalogue size. Each quote carries a `source` field
@@ -309,10 +356,19 @@ for attribution.
   `quotes`, `category`, `page`, `page_size`, `total`, `total_pages`, `has_next`,
   `has_previous`. Each quote has `text`, `author`, `source`, `tags`.
 
+- [GET {CROSSWORD_ENDPOINT}]({base_url}{CROSSWORD_ENDPOINT}): Generates a playable crossword.
+  Query parameters: `category` (animals, food, geography, music, science, sports),
+  `size` ({crossword.MIN_SIZE}-{crossword.MAX_SIZE}, default {crossword.DEFAULT_SIZE}), `word_count`, and `seed`.
+  Responds with `puzzle` (grid to solve), `solution`, and numbered `across`/`down`
+  clues carrying `row`, `col` and `length`. `"#"` marks a blank cell. Generated in
+  memory with no upstream request, and deterministic for a given `seed`.
+- [GET {CROSSWORD_ENDPOINT}/categories]({base_url}{CROSSWORD_ENDPOINT}/categories): Valid crossword categories.
+
 ## MCP
 
 - [MCP server]({base_url}/mcp): Streamable HTTP endpoint exposing `search_quotes`,
-  `random_quote` and `list_categories` as typed tools. No authentication required.
+  `random_quote`, `list_categories`, `generate_crossword` and
+  `list_crossword_categories` as typed tools. No authentication required.
 
 ## Docs
 
@@ -412,8 +468,12 @@ Request: `GET {base_url}{QUOTES_ENDPOINT}?category=inspirational&page=1&page_siz
 
 ## Other endpoints
 
+- `GET {CROSSWORD_ENDPOINT}` — generate a crossword puzzle. Parameters: `category`,
+  `size` ({crossword.MIN_SIZE}-{crossword.MAX_SIZE}), `word_count`, `seed`. Returns `puzzle`, `solution`, and
+  numbered `across`/`down` clues. Deterministic per `seed`; no upstream request.
+- `GET {CROSSWORD_ENDPOINT}/categories` — valid crossword categories.
 - `POST /mcp` — MCP server (streamable HTTP). Tools: `search_quotes`, `random_quote`,
-  `list_categories`. No authentication.
+  `list_categories`, `generate_crossword`, `list_crossword_categories`. No authentication.
 - `GET /` — landing page.
 - `GET /quickstart` — quickstart guide.
 - `GET /pricing` — plans and limits.
@@ -660,6 +720,108 @@ async def get_quotes(
         logger.error(f"Error processing request: {str(e)}")
         raise HTTPException(status_code=500, detail="Internal server error")
 
+@app.get(
+    CROSSWORD_ENDPOINT,
+    response_class=JSONResponse,
+    response_model=CrosswordPuzzle,
+    tags=["crossword"],
+    summary="Generate a crossword",
+    responses={
+        400: {"model": ErrorResponse, "description": "Unknown category."},
+        500: {"model": ErrorResponse, "description": "The request failed unexpectedly."},
+    },
+)
+async def get_crossword(
+    category: Optional[str] = Query(
+        None,
+        description="Word category, e.g. `animals`, `food`, `science`. Omit to mix every category.",
+        examples=["animals"],
+    ),
+    size: int = Query(
+        crossword.DEFAULT_SIZE,
+        ge=crossword.MIN_SIZE,
+        le=crossword.MAX_SIZE,
+        description=f"Grid width and height ({crossword.MIN_SIZE}-{crossword.MAX_SIZE}).",
+    ),
+    word_count: Optional[int] = Query(
+        None,
+        ge=crossword.MIN_WORDS,
+        le=crossword.MAX_WORDS,
+        description="How many words to aim for. Defaults to roughly the grid size.",
+    ),
+    seed: Optional[int] = Query(
+        None,
+        ge=1,
+        description="Reuse a seed from a previous response to regenerate that exact puzzle.",
+    ),
+) -> Dict[str, Any]:
+    """
+    Generate a crossword puzzle from the bundled word bank.
+
+    Words interlock criss-cross style: each one crosses a letter of a word
+    already on the grid. The response carries the blank grid to solve, the full
+    solution, and numbered across/down clues whose coordinates match the grid.
+
+    Generation is deterministic for a given `seed`, so the same seed always
+    returns the same puzzle — store it if you need to serve a puzzle again, or
+    to give every player the same daily grid.
+
+    Puzzles are built in memory from a word bank shipped with the API, so this
+    endpoint makes no upstream request and responds immediately.
+    """
+    try:
+        return crossword.generate_puzzle(
+            category=category, size=size, word_count=word_count, seed=seed
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"Error generating crossword: {str(e)}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+
+@app.get(
+    f"{CROSSWORD_ENDPOINT}/daily",
+    response_class=JSONResponse,
+    response_model=DailyCrossword,
+    tags=["crossword"],
+    summary="Today's crossword",
+)
+async def get_daily_crossword(
+    size: int = Query(
+        crossword.DEFAULT_SIZE,
+        ge=crossword.MIN_SIZE,
+        le=crossword.MAX_SIZE,
+        description=f"Grid width and height ({crossword.MIN_SIZE}-{crossword.MAX_SIZE}).",
+    ),
+) -> Dict[str, Any]:
+    """
+    The puzzle of the day — the same grid for every caller until UTC midnight.
+
+    The seed is derived from today's UTC date, so you can run a daily puzzle
+    where everyone plays the same board without storing anything. The theme
+    rotates with the date. The response adds a `date` field; everything else
+    matches `GET /v1/crossword`.
+    """
+    try:
+        return crossword.generate_daily(size=size)
+    except Exception as e:
+        logger.error(f"Error generating daily crossword: {str(e)}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+
+@app.get(
+    f"{CROSSWORD_ENDPOINT}/categories",
+    response_class=JSONResponse,
+    response_model=CategoryList,
+    tags=["crossword"],
+    summary="List crossword categories",
+)
+async def get_crossword_categories() -> Dict[str, Any]:
+    """List the word categories available to the crossword generator."""
+    return {"categories": crossword.available_categories()}
+
+
 # ---------------------------------------------------------------------------
 # MCP server
 #
@@ -729,6 +891,54 @@ async def random_quote(category: Optional[str] = None) -> Quote:
             "Call list_categories for values known to return results."
         )
     return Quote(**random.choice(quotes))
+
+@mcp.tool()
+async def generate_crossword(
+    category: Optional[str] = None,
+    size: int = crossword.DEFAULT_SIZE,
+    word_count: Optional[int] = None,
+    seed: Optional[int] = None,
+) -> CrosswordPuzzle:
+    """Generate a playable crossword puzzle.
+
+    Call this when the user asks for a crossword, a word puzzle, or a themed
+    grid. Call list_crossword_categories first if you need a valid category.
+
+    Args:
+        category: Word category such as animals, food or science. Omit to mix all.
+        size: Grid width and height, 7 to 21. Bigger grids fit more words.
+        word_count: Roughly how many words to interlock. Defaults to about the grid size.
+        seed: Reuse a seed from an earlier puzzle to regenerate it exactly.
+
+    Returns the blank grid, the solution, and numbered across/down clues with
+    their grid coordinates. Render `puzzle` for the player and keep `solution`
+    back; "#" marks a blank cell and "" a letter to fill in.
+    """
+    return CrosswordPuzzle(**crossword.generate_puzzle(
+        category=category, size=size, word_count=word_count, seed=seed
+    ))
+
+@mcp.tool()
+async def daily_crossword(size: int = crossword.DEFAULT_SIZE) -> DailyCrossword:
+    """Get today's crossword — the same puzzle for everyone until UTC midnight.
+
+    Call this when the user asks for "today's puzzle", a daily crossword, or
+    wants the same grid another player is solving. Use generate_crossword instead
+    when they want a fresh or themed puzzle on demand.
+
+    Args:
+        size: Grid width and height, 7 to 21.
+    """
+    return DailyCrossword(**crossword.generate_daily(size=size))
+
+@mcp.tool()
+async def list_crossword_categories() -> CategoryList:
+    """List word categories the crossword generator can build a themed puzzle from.
+
+    Call this before generate_crossword when the user names a theme, so you pass
+    a category that exists rather than guessing.
+    """
+    return CategoryList(categories=crossword.available_categories())
 
 @mcp.tool()
 async def list_categories() -> CategoryList:

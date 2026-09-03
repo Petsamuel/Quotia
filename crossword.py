@@ -1,0 +1,293 @@
+"""Crossword puzzle generation.
+
+Builds criss-cross puzzles: words interlock on an open grid, each new word
+crossing a letter of one already placed. Unlike a dense American-style grid this
+always yields a valid, solvable puzzle rather than failing to fill.
+
+The word bank ships with the repo (data/crossword_words.json) with clues written
+for this project, so generation needs no network call and no third-party rights.
+"""
+
+import hashlib
+import json
+import logging
+import random
+from datetime import date, datetime, timezone
+from functools import lru_cache
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Tuple
+
+logger = logging.getLogger(__name__)
+
+WORDS_FILE = Path(__file__).resolve().parent / "data" / "crossword_words.json"
+
+BLOCK = "#"
+
+MIN_SIZE = 7
+MAX_SIZE = 21
+DEFAULT_SIZE = 11
+
+MIN_WORDS = 4
+MAX_WORDS = 40
+
+# A placement pass is cheap; retrying with a different shuffle beats trying to be
+# clever about ordering, because the first word chosen dominates the outcome.
+PLACEMENT_ATTEMPTS = 60
+
+
+@lru_cache(maxsize=1)
+def load_word_bank() -> Dict[str, List[Dict[str, str]]]:
+    """Read the bundled word bank once, uppercasing every answer."""
+    with WORDS_FILE.open(encoding="utf-8") as handle:
+        raw = json.load(handle)
+
+    bank: Dict[str, List[Dict[str, str]]] = {}
+    for category, entries in raw.items():
+        cleaned = []
+        for entry in entries:
+            word = str(entry["word"]).strip().upper()
+            if word.isalpha() and len(word) >= 2:
+                cleaned.append({"word": word, "clue": str(entry["clue"]).strip()})
+        if cleaned:
+            bank[category] = cleaned
+    return bank
+
+
+def available_categories() -> List[str]:
+    """Category names that have a usable word list."""
+    return sorted(load_word_bank())
+
+
+def _fits(grid, word, row, col, dr, dc, size) -> bool:
+    """Whether `word` can be laid down without breaking crossword adjacency rules."""
+    end_row, end_col = row + dr * (len(word) - 1), col + dc * (len(word) - 1)
+    if not (0 <= row < size and 0 <= col < size and 0 <= end_row < size and 0 <= end_col < size):
+        return False
+
+    # The cells just before and just after the word must be empty, or the word
+    # would run into a neighbour and form a longer, unintended entry.
+    before_r, before_c = row - dr, col - dc
+    after_r, after_c = end_row + dr, end_col + dc
+    for r, c in ((before_r, before_c), (after_r, after_c)):
+        if 0 <= r < size and 0 <= c < size and grid[r][c] is not None:
+            return False
+
+    crossings = 0
+    for i, letter in enumerate(word):
+        r, c = row + dr * i, col + dc * i
+        existing = grid[r][c]
+        if existing is not None:
+            if existing != letter:
+                return False
+            crossings += 1
+            continue
+
+        # For a fresh cell, the two perpendicular neighbours must be empty, or
+        # placing this letter would silently create a second word alongside.
+        pr, pc = dc, dr  # perpendicular direction
+        for sign in (1, -1):
+            nr, nc = r + pr * sign, c + pc * sign
+            if 0 <= nr < size and 0 <= nc < size and grid[nr][nc] is not None:
+                return False
+
+    return crossings >= 1
+
+
+def _place(grid, word, row, col, dr, dc) -> None:
+    for i, letter in enumerate(word):
+        grid[row + dr * i][col + dc * i] = letter
+
+
+def _try_build(words: List[Dict[str, str]], size: int, target: int, rng: random.Random):
+    """One placement pass. Returns (grid, placements) or None if nothing interlocked."""
+    grid: List[List[Optional[str]]] = [[None] * size for _ in range(size)]
+    candidates = [w for w in words if len(w["word"]) <= size]
+    if not candidates:
+        return None
+
+    rng.shuffle(candidates)
+    # Longest first: a long spine gives later words many crossing points.
+    candidates.sort(key=lambda w: len(w["word"]), reverse=True)
+
+    first = candidates[0]
+    row = size // 2
+    col = max(0, (size - len(first["word"])) // 2)
+    _place(grid, first["word"], row, col, 0, 1)
+    placements = [{**first, "row": row, "col": col, "direction": "across"}]
+    used = {first["word"]}
+
+    for entry in candidates[1:]:
+        if len(placements) >= target:
+            break
+        word = entry["word"]
+        if word in used:
+            continue
+
+        options: List[Tuple[int, int, int, int]] = []
+        for i, letter in enumerate(word):
+            for r in range(size):
+                for c in range(size):
+                    if grid[r][c] != letter:
+                        continue
+                    # Cross the existing letter in both orientations.
+                    for dr, dc in ((1, 0), (0, 1)):
+                        start_r, start_c = r - dr * i, c - dc * i
+                        if _fits(grid, word, start_r, start_c, dr, dc, size):
+                            options.append((start_r, start_c, dr, dc))
+
+        if not options:
+            continue
+
+        start_r, start_c, dr, dc = rng.choice(options)
+        _place(grid, word, start_r, start_c, dr, dc)
+        placements.append({
+            **entry,
+            "row": start_r,
+            "col": start_c,
+            "direction": "down" if dr else "across",
+        })
+        used.add(word)
+
+    if len(placements) < MIN_WORDS:
+        return None
+    return grid, placements
+
+
+def _extract_entries(grid, size, clues: Dict[str, str]):
+    """Read across/down entries off the finished grid and number them.
+
+    Deriving entries from the grid rather than from the placement list means the
+    clue list can never disagree with what a solver actually sees.
+    """
+    across: List[Dict[str, Any]] = []
+    down: List[Dict[str, Any]] = []
+    number = 0
+
+    for r in range(size):
+        for c in range(size):
+            if grid[r][c] is None:
+                continue
+
+            starts_across = (c == 0 or grid[r][c - 1] is None) and (
+                c + 1 < size and grid[r][c + 1] is not None
+            )
+            starts_down = (r == 0 or grid[r - 1][c] is None) and (
+                r + 1 < size and grid[r + 1][c] is not None
+            )
+            if not (starts_across or starts_down):
+                continue
+
+            number += 1
+            if starts_across:
+                letters = ""
+                cc = c
+                while cc < size and grid[r][cc] is not None:
+                    letters += grid[r][cc]
+                    cc += 1
+                across.append({
+                    "number": number, "clue": clues.get(letters, ""), "answer": letters,
+                    "row": r, "col": c, "length": len(letters),
+                })
+            if starts_down:
+                letters = ""
+                rr = r
+                while rr < size and grid[rr][c] is not None:
+                    letters += grid[rr][c]
+                    rr += 1
+                down.append({
+                    "number": number, "clue": clues.get(letters, ""), "answer": letters,
+                    "row": r, "col": c, "length": len(letters),
+                })
+
+    return across, down
+
+
+def daily_seed(day: Optional[date] = None) -> Tuple[int, str]:
+    """Derive a stable seed from a UTC date.
+
+    Hashing the date rather than using its ordinal means consecutive days produce
+    unrelated puzzles instead of near-identical ones.
+    """
+    day = day or datetime.now(timezone.utc).date()
+    iso = day.isoformat()
+    digest = hashlib.sha256(f"quotia-crossword-{iso}".encode()).hexdigest()
+    return int(digest[:8], 16) % (2**31 - 1) or 1, iso
+
+
+def generate_daily(size: int = DEFAULT_SIZE, day: Optional[date] = None) -> Dict[str, Any]:
+    """Today's puzzle: same grid for every caller, changing at UTC midnight.
+
+    The category rotates with the date so consecutive days aren't all one theme.
+    """
+    seed, iso = daily_seed(day)
+    categories = available_categories()
+    category = categories[seed % len(categories)] if categories else None
+
+    puzzle = generate_puzzle(category=category, size=size, seed=seed)
+    puzzle["date"] = iso
+    return puzzle
+
+
+def generate_puzzle(
+    category: Optional[str] = None,
+    size: int = DEFAULT_SIZE,
+    word_count: Optional[int] = None,
+    seed: Optional[int] = None,
+) -> Dict[str, Any]:
+    """Generate one crossword puzzle.
+
+    Returns the solution grid, a blank grid to solve, numbered across/down clues,
+    and the seed used — pass the same seed back to reproduce the puzzle exactly.
+    """
+    bank = load_word_bank()
+    category = (category or "").strip().lower() or None
+    if category and category not in bank:
+        raise ValueError(
+            f"Unknown category {category!r}. Available: {', '.join(sorted(bank))}."
+        )
+
+    size = max(MIN_SIZE, min(size, MAX_SIZE))
+    if word_count is None:
+        word_count = max(MIN_WORDS, min(size, MAX_WORDS))
+    word_count = max(MIN_WORDS, min(word_count, MAX_WORDS))
+
+    words = list(bank[category]) if category else [w for ws in bank.values() for w in ws]
+    clues = {w["word"]: w["clue"] for w in words}
+
+    if seed is None:
+        seed = random.randrange(1, 2**31 - 1)
+    rng = random.Random(seed)
+
+    best = None
+    for _ in range(PLACEMENT_ATTEMPTS):
+        built = _try_build(words, size, word_count, rng)
+        if built and (best is None or len(built[1]) > len(best[1])):
+            best = built
+            if len(best[1]) >= word_count:
+                break
+
+    if best is None:
+        raise ValueError("Could not build a puzzle from the available words.")
+
+    grid, placements = best
+    across, down = _extract_entries(grid, size, clues)
+
+    # An entry with no clue means the grid formed a word we never placed; the
+    # adjacency rules should prevent it, so surface it rather than ship it.
+    unclued = [e["answer"] for e in across + down if not e["clue"]]
+    if unclued:
+        logger.warning(f"Crossword produced unclued entries: {unclued}")
+
+    solution = [[cell if cell else BLOCK for cell in row] for row in grid]
+    puzzle = [[("" if cell else BLOCK) for cell in row] for row in grid]
+
+    return {
+        "category": category,
+        "size": size,
+        "seed": seed,
+        "word_count": len(placements),
+        "puzzle": puzzle,
+        "solution": solution,
+        "across": across,
+        "down": down,
+    }

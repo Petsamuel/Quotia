@@ -13,6 +13,7 @@ and no route exposes it.
 """
 
 import hashlib
+import json
 import logging
 import random
 import sqlite3
@@ -92,11 +93,50 @@ def connect() -> sqlite3.Connection:
 
 
 @lru_cache(maxsize=1)
+def _seed_bank() -> Dict[str, Tuple[Dict[str, str], ...]]:
+    """The seed file, parsed in memory.
+
+    Last-resort source of words when SQLite is unusable — an unwritable
+    filesystem, a corrupt database, a build that never ran. A puzzle endpoint
+    returning 500 because a cache file is missing is a worse outcome than
+    reading the words directly.
+    """
+    with SEED_FILE.open(encoding="utf-8") as handle:
+        raw = json.load(handle)
+
+    bank: Dict[str, Tuple[Dict[str, str], ...]] = {}
+    for category, entries in raw.items():
+        cleaned = []
+        for entry in entries:
+            word = str(entry.get("word", "")).strip().upper()
+            clue = str(entry.get("clue", "")).strip()
+            if word.isalpha() and len(word) >= 2 and clue:
+                cleaned.append({"word": word, "clue": clue})
+        if cleaned:
+            bank[category.strip().lower()] = tuple(cleaned)
+    return bank
+
+
+def _query(sql: str, params: Optional[List[Any]] = None):
+    """Run a read-only query, or return None if the database can't serve it."""
+    try:
+        with connect() as connection:
+            return connection.execute(sql, params or []).fetchall()
+    except Exception as error:
+        logger.warning(
+            "Word bank database unavailable (%s); falling back to %s.",
+            error, SEED_FILE.name,
+        )
+        return None
+
+
+@lru_cache(maxsize=1)
 def available_categories() -> List[str]:
     """Category names present in the word bank."""
-    with connect() as connection:
-        rows = connection.execute("SELECT name FROM categories ORDER BY name").fetchall()
-    return [row["name"] for row in rows]
+    rows = _query("SELECT name FROM categories ORDER BY name")
+    if rows:
+        return [row["name"] for row in rows]
+    return sorted(_seed_bank())
 
 
 @lru_cache(maxsize=64)
@@ -129,9 +169,27 @@ def words_for(category: Optional[str] = None, max_length: Optional[int] = None):
 
     sql.append("ORDER BY w.length DESC, w.word")
 
-    with connect() as connection:
-        rows = connection.execute(" ".join(sql), params).fetchall()
-    return tuple({"word": row["word"], "clue": row["clue"]} for row in rows)
+    rows = _query(" ".join(sql), params)
+    if rows is not None:
+        return tuple({"word": row["word"], "clue": row["clue"]} for row in rows)
+
+    # Same filtering, straight from the seed file.
+    bank = _seed_bank()
+    source = bank.get(category, ()) if category else tuple(
+        word for words in bank.values() for word in words
+    )
+    seen = set()
+    result = []
+    for entry in source:
+        if max_length is not None and len(entry["word"]) > max_length:
+            continue
+        key = (entry["word"], entry["clue"])
+        if key in seen:
+            continue
+        seen.add(key)
+        result.append(entry)
+    result.sort(key=lambda e: (-len(e["word"]), e["word"]))
+    return tuple(result)
 
 
 def _fits(grid, word, row, col, dr, dc, size) -> bool:

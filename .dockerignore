@@ -1,0 +1,21 @@
+# Without this, `COPY . /app` ships the 86MB Windows virtualenv into the image
+# along with Windows-compiled bytecode — slow builds, and nothing usable on Linux.
+env/
+venv/
+.venv/
+
+__pycache__/
+*.pyc
+*.pyo
+
+# Rebuilt inside the image by build_wordbank.py; never copy a host-built one in,
+# or its newer mtime suppresses the rebuild.
+data/wordbank.db
+data/*.db.tmp
+
+.git/
+.gitignore
+.vscode/
+.idea/
+*.md
+LICENSE

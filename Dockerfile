@@ -17,6 +17,8 @@ COPY --chown=user . /app
 
 # Compile the crossword word bank into SQLite at build time so the first request
 # doesn't pay for it. The database is generated, never committed, never served.
-RUN python build_wordbank.py
+# Non-fatal on purpose: the app falls back to the seed file, so a build-time
+# hiccup here should not stop the whole image from shipping.
+RUN python build_wordbank.py || echo "WARNING: word bank build failed; the app will read the seed file instead"
 
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "7860"]

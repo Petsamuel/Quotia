@@ -296,10 +296,80 @@ FastAPICache.init(InMemoryBackend(), prefix="fastapi-cache")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
+    # The API is public and reads no cookie or Authorization header, so there are
+    # no credentials to share. Pairing "*" with allow_credentials=True is the
+    # combination browsers reject outright, and had this API ever gained a session
+    # cookie it would have handed every origin the right to use it.
+    allow_credentials=False,
+    # The REST surface is GET-only, but the MCP transport mounted at /mcp uses
+    # POST to send messages and DELETE to end a session. Nothing here answers
+    # PUT or PATCH, so they stay off the list.
+    allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
     allow_headers=["*"],
 )
+
+# Every origin the pages actually pull from, gathered from the markup rather than
+# assumed — a policy that blocks a real dependency breaks the site, and one that
+# allows extras is not doing its job.
+#
+#   cdnjs.cloudflare.com  GSAP and Prism
+#   cdn.jsdelivr.net      Tailwind, plus the Swagger UI and ReDoc bundles on /docs
+#   fonts.googleapis.com  font stylesheets      fonts.gstatic.com  the font files
+#   googletagmanager.com  GTM loader, its noscript iframe and the GA beacons
+#
+# script-src keeps 'unsafe-inline' because every page carries the inline GTM
+# loader, GTM injects further inline tags at runtime, and /docs and /redoc are
+# rendered by FastAPI with inline configuration blocks. Tightening it means
+# per-request nonces, which is a real change rather than a header tweak.
+_GOOGLE_ANALYTICS = "https://www.google-analytics.com https://*.google-analytics.com https://*.analytics.google.com"
+CONTENT_SECURITY_POLICY = "; ".join([
+    "default-src 'self'",
+    "base-uri 'self'",
+    "object-src 'none'",
+    "frame-ancestors 'none'",
+    "form-action 'self'",
+    "script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://www.googletagmanager.com",
+    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net",
+    "font-src 'self' data: https://fonts.gstatic.com",
+    # blob: covers the canvas share image; the GTM host serves tracking pixels.
+    f"img-src 'self' data: blob: https://www.googletagmanager.com {_GOOGLE_ANALYTICS}",
+    f"connect-src 'self' https://www.googletagmanager.com {_GOOGLE_ANALYTICS}",
+    "frame-src https://www.googletagmanager.com",
+    "worker-src 'self' blob:",  # ReDoc runs its renderer in a blob worker
+    "upgrade-insecure-requests",
+])
+
+SECURITY_HEADERS = {
+    "Content-Security-Policy": CONTENT_SECURITY_POLICY,
+    "X-Content-Type-Options": "nosniff",
+    # frame-ancestors above is the modern control; this covers older browsers.
+    "X-Frame-Options": "DENY",
+    "Referrer-Policy": "strict-origin-when-cross-origin",
+    "Permissions-Policy": "camera=(), microphone=(), geolocation=(), payment=(), usb=()",
+    "Cross-Origin-Opener-Policy": "same-origin",
+    # Deliberately cross-origin, not same-origin: this is a public API, and the
+    # /og card images are fetched by social crawlers from other hosts.
+    "Cross-Origin-Resource-Policy": "cross-origin",
+}
+
+# Two years, subdomains included. No preload directive — that is a one-way trip
+# through a browser-vendor list and should be a deliberate decision, not a default.
+HSTS_HEADER = "max-age=63072000; includeSubDomains"
+
+
+@app.middleware("http")
+async def security_headers(request: Request, call_next):
+    """Attach the security headers to every response, including errors and /static."""
+    response = await call_next(request)
+    for header, value in SECURITY_HEADERS.items():
+        response.headers.setdefault(header, value)
+
+    # Only meaningful over TLS, and the proxy header is what survives Cloudflare
+    # and Vercel terminating it upstream.
+    forwarded_proto = request.headers.get("x-forwarded-proto", request.url.scheme)
+    if forwarded_proto == "https":
+        response.headers.setdefault("Strict-Transport-Security", HSTS_HEADER)
+    return response
 
 if STATIC_DIR.is_dir():
     app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")

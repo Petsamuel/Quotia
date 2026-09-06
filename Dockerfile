@@ -23,4 +23,6 @@ RUN python build_wordbank.py || echo "WARNING: word bank build failed; the app w
 
 EXPOSE 7860
 
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "7860"]
+# --no-server-header drops the "server: uvicorn" banner; no need to advertise the
+# stack and its version to anyone scanning.
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "7860", "--no-server-header"]

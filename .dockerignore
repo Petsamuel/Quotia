@@ -20,10 +20,5 @@ data/*.db.tmp
 *.md
 LICENSE
 
-# Cloudflare Worker shim and its deps run on the edge, not inside the container.
 node_modules/
-worker/
-wrangler.jsonc
-package.json
-package-lock.json
 .wrangler/

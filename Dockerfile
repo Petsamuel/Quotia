@@ -21,8 +21,6 @@ COPY --chown=user . /app
 # hiccup here should not stop the whole image from shipping.
 RUN python build_wordbank.py || echo "WARNING: word bank build failed; the app will read the seed file instead"
 
-# Declared for Cloudflare Containers, which needs the listening port published on
-# the image; must stay in sync with defaultPort in worker/index.js.
 EXPOSE 7860
 
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "7860"]

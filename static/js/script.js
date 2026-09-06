@@ -205,9 +205,18 @@ document.addEventListener('keydown', event => {
     if (event.key === 'Escape') closeAllShareMenus();
 });
 
+// X, WhatsApp and LinkedIn share by opening a URL, and none of their intent
+// endpoints take an image parameter — the only way to get a picture into the
+// post is to link a page they will crawl for an og:image. /q/{id} is that page.
+// Falls back to the site root for a quote served before ids existed.
+function shareUrl(quote) {
+    const origin = window.location.origin || 'https://quotia.kwenuai.com.ng';
+    return quote.id ? `${origin}/q/${quote.id}` : origin;
+}
+
 function shareToPlatform(platform, quote) {
     const text = quoteToText(quote);
-    const url = window.location.origin || 'https://quotia.io';
+    const url = shareUrl(quote);
     const urls = {
         x: `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`,
         whatsapp: `https://wa.me/?text=${encodeURIComponent(`${text} ${url}`)}`,
@@ -221,7 +230,7 @@ async function shareNative(quote) {
         await navigator.share({
             title: 'Quotia',
             text: quoteToText(quote),
-            url: window.location.origin || 'https://quotia.io',
+            url: shareUrl(quote),
         });
     } catch (error) {
         if (error && error.name !== 'AbortError') console.error('Share failed:', error);

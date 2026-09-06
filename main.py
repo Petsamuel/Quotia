@@ -18,6 +18,7 @@ from pydantic import BaseModel, Field
 from mcp.server.mcpserver import MCPServer
 from mcp.server.transport_security import TransportSecuritySettings
 import crossword
+import share_card
 import logging
 import os
 import random
@@ -47,6 +48,12 @@ HTML_PAGES = [
 
 QUOTES_ENDPOINT = "/v1/quote"
 CROSSWORD_ENDPOINT = "/v1/crossword"
+
+# Share permalinks. /q/{id} is the page social platforms crawl; /og/{id}.png is
+# the image its card is built from. Both take the signed id carried on every
+# quote, so neither needs storage the scraped corpus does not have.
+SHARE_PAGE_PREFIX = "/q"
+SHARE_IMAGE_PREFIX = "/og"
 
 # Absolute URLs in canonical tags, Open Graph, sitemap.xml and llms.txt must point
 # at the real public origin. Set QUOTIA_BASE_URL in production (e.g. behind a proxy
@@ -162,6 +169,13 @@ class Quote(BaseModel):
         default_factory=list,
         description="Categories the source filed this quote under. Empty if the source lists none.",
     )
+    id: str = Field(
+        "",
+        description=(
+            "Opaque id for this quote, derived from its text and author. Append it to "
+            "`/q/` for a shareable page whose link preview renders the quote as an image."
+        ),
+    )
 
     model_config = {
         "json_schema_extra": {
@@ -171,6 +185,7 @@ class Quote(BaseModel):
                     "author": "Albert Einstein",
                     "source": "toscrape",
                     "tags": ["change", "deep-thoughts", "thinking", "world"],
+                    "id": "eJwrzs...Q.3f6a1c9d2b0e4a17",
                 }
             ]
         }
@@ -293,6 +308,109 @@ for _path, _filename, _priority in HTML_PAGES:
         response_class=HTMLResponse,
         include_in_schema=False,
     )
+
+def _attr(value: str) -> str:
+    """Escape a string for use inside a double-quoted HTML attribute."""
+    return xml_escape(value, {'"': "&quot;"})
+
+
+def render_share_page(text: str, author: str, token: str, base_url: str) -> str:
+    """One quote as a standalone page whose OG tags point at its own rendered image.
+
+    Platforms will not accept an image through a share URL, so the image has to
+    be something they fetch themselves: they crawl this page and build the card
+    from the tags below.
+    """
+    page_url = f"{base_url}{SHARE_PAGE_PREFIX}/{token}"
+    image_url = f"{base_url}{SHARE_IMAGE_PREFIX}/{token}.png"
+    title = f"{author} — Quotia"
+    # Platforms show this under the image; the quote itself is already in the card.
+    description = text if len(text) <= 200 else f"{text[:197]}…"
+
+    return f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>{xml_escape(title)}</title>
+    <meta name="description" content="{_attr(description)}">
+    <!-- One page per quote would be thin, near-duplicate content at scale, so
+         keep it out of the index. Card crawlers ignore this and still read the
+         Open Graph tags below. -->
+    <meta name="robots" content="noindex, follow, max-image-preview:large">
+    <link rel="canonical" href="{_attr(page_url)}">
+
+    <meta property="og:type" content="article">
+    <meta property="og:site_name" content="Quotia">
+    <meta property="og:title" content="{_attr(title)}">
+    <meta property="og:description" content="{_attr(description)}">
+    <meta property="og:url" content="{_attr(page_url)}">
+    <meta property="og:image" content="{_attr(image_url)}">
+    <meta property="og:image:width" content="{share_card.CARD_WIDTH}">
+    <meta property="og:image:height" content="{share_card.CARD_HEIGHT}">
+    <meta property="og:image:alt" content="{_attr(f'{text} — {author}')}">
+    <meta property="og:locale" content="en_US">
+
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="{_attr(title)}">
+    <meta name="twitter:description" content="{_attr(description)}">
+    <meta name="twitter:image" content="{_attr(image_url)}">
+    <meta name="twitter:image:alt" content="{_attr(f'{text} — {author}')}">
+
+    <meta name="theme-color" content="#F2F0EA">
+    <link rel="icon" href="/static/assets/logo.svg" type="image/svg+xml">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=Space+Mono&display=swap" rel="stylesheet">
+    <style>
+        *{{box-sizing:border-box;margin:0;padding:0}}
+        body{{background:#F2F0EA;color:#050505;font-family:'Space Mono',monospace;
+             min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px}}
+        main{{border:2px solid #050505;max-width:760px;width:100%;padding:56px 48px;background:#F2F0EA}}
+        blockquote{{font-family:'Playfair Display',Georgia,serif;font-weight:700;
+                   font-size:clamp(1.6rem,4.4vw,2.6rem);line-height:1.28}}
+        cite{{display:block;margin-top:28px;font-style:normal;font-size:.9rem;color:#5A574E}}
+        .home{{display:inline-block;margin-top:40px;padding:12px 22px;border:2px solid #050505;
+              color:#050505;text-decoration:none;font-size:.82rem;letter-spacing:.08em;text-transform:uppercase}}
+        .home:hover{{background:#050505;color:#F2F0EA}}
+    </style>
+</head>
+<body>
+    <main>
+        <blockquote>&ldquo;{xml_escape(text)}&rdquo;</blockquote>
+        <cite>&mdash; {xml_escape(author)}</cite>
+        <a class="home" href="/">More quotes &rarr;</a>
+    </main>
+</body>
+</html>
+"""
+
+
+@app.get(SHARE_PAGE_PREFIX + "/{token}", include_in_schema=False)
+async def share_page(token: str, request: Request) -> HTMLResponse:
+    """The link that gets posted to X, LinkedIn or WhatsApp."""
+    quote = share_card.decode_quote(token)
+    if quote is None:
+        raise HTTPException(status_code=404, detail="Unknown share link")
+    text, author, _source = quote
+    return HTMLResponse(render_share_page(text, author, token, resolve_base_url(request)))
+
+
+@app.get(SHARE_IMAGE_PREFIX + "/{token}.png", include_in_schema=False)
+async def share_image(token: str) -> Response:
+    """The card image itself. A token always renders the same bytes, so it can
+    be cached forever — crawlers refetch it far more often than users do."""
+    quote = share_card.decode_quote(token)
+    if quote is None:
+        raise HTTPException(status_code=404, detail="Unknown share link")
+    png = share_card.render_card(*quote)
+    return Response(
+        content=png,
+        media_type="image/png",
+        headers={"Cache-Control": "public, max-age=31536000, immutable"},
+    )
+
 
 @app.get("/doc", include_in_schema=False)
 @app.get("/doc/", include_in_schema=False)
@@ -653,6 +771,13 @@ async def fetch_quotes(
         total_pages = ceil(total / page_size)
         start = (page - 1) * page_size
         window = unique_quotes[start:start + page_size]
+
+        # Only the page being returned gets an id, so signing cost tracks the
+        # response rather than everything the sources happened to hand back.
+        for quote in window:
+            quote["id"] = share_card.encode_quote(
+                quote["text"], quote["author"], quote.get("source", "")
+            )
 
         logger.info(f"Retrieved {total} unique quotes, returning {len(window)} for page {page}")
         return {

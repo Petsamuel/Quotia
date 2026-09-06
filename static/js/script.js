@@ -405,16 +405,33 @@ function buildShareMenu(quote) {
 // Pages seen so far, so shuffling pulls genuinely different quotes rather than
 // only reordering the six already on screen. Capped because deeper pages cost
 // another upstream request per source.
-const MAX_SHUFFLE_PAGE = 5;
-let availablePages = 1;
+const QUOTES_PER_VIEW = 6;
+// One seeded request covers roughly ten shuffles, so clicking repeatedly does
+// not hammer the scrapers.
+const SHUFFLE_BATCH_SIZE = 60;
+
+// Shuffling used to re-request one of the first five pages, which meant the same
+// six quotes came back often. Instead: pull a large seeded batch, hand out only
+// quotes not shown yet, and refill with a new seed when it runs low. Quote ids
+// make "already seen" exact instead of a guess at equality.
+let shufflePool = [];
+let seenQuoteIds = new Set();
+let shuffleCategory = null;
+
+function quoteKey(quote) {
+    return quote.id || `${quote.text}|${quote.author}`;
+}
+
+function resetShuffleState(category) {
+    shufflePool = [];
+    seenQuoteIds = new Set();
+    shuffleCategory = category;
+}
 
 function initCategoryFilter() {
     const select = document.getElementById('category-select');
     if (!select) return;
-    select.addEventListener('change', () => {
-        availablePages = 1; // page count is per-category
-        loadQuotes(select.value);
-    });
+    select.addEventListener('change', () => loadQuotes(select.value));
 }
 
 function initShuffle() {
@@ -519,24 +536,66 @@ async function copyQuote(button, quote) {
     }
 }
 
+async function fetchShuffleBatch(category) {
+    const params = new URLSearchParams({
+        page_size: String(SHUFFLE_BATCH_SIZE),
+        // 1..2^31-1, matching the range the API accepts for a seed.
+        seed: String(1 + Math.floor(Math.random() * 2147483646)),
+    });
+    if (category) params.set('category', category);
+
+    const response = await fetch(`/v1/quote?${params}`);
+    if (!response.ok) throw new Error(`Quote request failed: ${response.status}`);
+    const data = await response.json();
+    return data.quotes || [];
+}
+
+async function nextShuffledQuotes(category, count) {
+    if (category !== shuffleCategory) resetShuffleState(category);
+
+    let unseen = shufflePool.filter(quote => !seenQuoteIds.has(quoteKey(quote)));
+
+    if (unseen.length < count) {
+        const batch = await fetchShuffleBatch(category);
+        const byKey = new Map(shufflePool.concat(batch).map(quote => [quoteKey(quote), quote]));
+        shufflePool = Array.from(byKey.values());
+        unseen = shufflePool.filter(quote => !seenQuoteIds.has(quoteKey(quote)));
+
+        // Everything the sources return has been shown at least once. Start the
+        // cycle again rather than leaving the shuffle button doing nothing.
+        if (unseen.length < count) {
+            seenQuoteIds.clear();
+            unseen = shufflePool;
+        }
+    }
+
+    const picked = shuffled(unseen).slice(0, count);
+    picked.forEach(quote => seenQuoteIds.add(quoteKey(quote)));
+    return picked;
+}
+
 async function loadQuotes(category = '', { shuffle = false } = {}) {
     const quotesContainer = document.getElementById('quotes-container');
     if (!quotesContainer) return;
 
-    const params = new URLSearchParams({ page_size: '6' });
-    if (category) params.set('category', category);
-    if (shuffle) {
-        const depth = Math.max(1, Math.min(availablePages, MAX_SHUFFLE_PAGE));
-        params.set('page', String(1 + Math.floor(Math.random() * depth)));
-    }
-
     quotesContainer.setAttribute('aria-busy', 'true');
 
     try {
-        const response = await fetch(`/v1/quote?${params}`);
-        const data = await response.json();
-        availablePages = data.total_pages || 1;
-        const quotes = shuffle ? shuffled(data.quotes || []) : (data.quotes || []);
+        let quotes;
+        if (shuffle) {
+            quotes = await nextShuffledQuotes(category, QUOTES_PER_VIEW);
+        } else {
+            // The daily endpoint rotates at UTC midnight: steady through the day,
+            // never the same set as yesterday.
+            const params = new URLSearchParams({ page_size: String(QUOTES_PER_VIEW) });
+            if (category) params.set('category', category);
+            const response = await fetch(`/v1/quote/daily?${params}`);
+            const data = await response.json();
+            quotes = data.quotes || [];
+            // Today's six count as seen, so the first shuffle is new material.
+            resetShuffleState(category);
+            quotes.forEach(quote => seenQuoteIds.add(quoteKey(quote)));
+        }
 
         quotesContainer.innerHTML = ''; // Clear existing quotes
 

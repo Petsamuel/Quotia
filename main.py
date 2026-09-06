@@ -19,15 +19,17 @@ from mcp.server.mcpserver import MCPServer
 from mcp.server.transport_security import TransportSecuritySettings
 import crossword
 import share_card
+import hashlib
 import logging
 import os
 import random
+import re
 from contextlib import asynccontextmanager
 from datetime import date as date_type, datetime, timezone
 from functools import lru_cache
 from math import ceil
 from pathlib import Path
-from urllib.parse import quote as urlquote
+from urllib.parse import quote as urlquote, unquote
 from xml.sax.saxutils import escape as xml_escape
 from typing import Any, Optional, Dict, List
 
@@ -75,6 +77,21 @@ MAX_PAGE_SIZE = 100
 # Upper bound on how many pages we pull from each source for one request. Deeper
 # pages cost another round trip per source, so this caps the scraping fan-out.
 MAX_SOURCE_PAGES = 5
+
+# Wikiquote theme pages used when no category is given. Broad, well-populated
+# subjects, so the unfiltered mix stays varied as the rotation moves through them.
+WIKIQUOTE_THEMES = [
+    "Love",
+    "Life",
+    "Happiness",
+    "Friendship",
+    "Hope",
+    "Courage",
+    "Wisdom",
+    "Freedom",
+    "Truth",
+    "Knowledge",
+]
 
 # Rough number of quotes one page of one source yields. Only used to decide how
 # many source pages to request; the real count is whatever comes back.
@@ -164,7 +181,10 @@ class Quote(BaseModel):
 
     text: str = Field(..., description="The quote text, without surrounding quotation marks.")
     author: str = Field(..., description="Name of the person the quote is attributed to.")
-    source: str = Field(..., description="Site the quote was scraped from (`toscrape` or `goodreads`).")
+    source: str = Field(
+        ...,
+        description="Site the quote was scraped from (`toscrape`, `goodreads` or `wikiquote`).",
+    )
     tags: List[str] = Field(
         default_factory=list,
         description="Categories the source filed this quote under. Empty if the source lists none.",
@@ -212,6 +232,13 @@ class QuotesResponse(BaseModel):
     total_pages: int = Field(..., description="Number of pages `total` divides into at this `page_size`.", ge=0)
     has_next: bool = Field(..., description="Whether a page after this one exists.")
     has_previous: bool = Field(..., description="Whether a page before this one exists.")
+
+
+class DailyQuotes(QuotesResponse):
+    """The rotation of the day, identical for every caller until UTC midnight."""
+
+    date: str = Field(..., description="UTC date this selection belongs to, as YYYY-MM-DD.")
+    seed: int = Field(..., description="Seed behind this selection. Pass it as `seed` to reproduce it.")
 
 
 class ErrorResponse(BaseModel):
@@ -471,9 +498,14 @@ for attribution.
 
 - [GET {QUOTES_ENDPOINT}]({base_url}{QUOTES_ENDPOINT}): Returns a page of quotes. Query
   parameters: `category` (tag such as love, inspirational, humor), `page`
-  (1-based, default 1), `page_size` (1-{MAX_PAGE_SIZE}, default {DEFAULT_PAGE_SIZE}). Responds with
+  (1-based, default 1), `page_size` (1-{MAX_PAGE_SIZE}, default {DEFAULT_PAGE_SIZE}), `seed`
+  (shuffle the result set deterministically). Responds with
   `quotes`, `category`, `page`, `page_size`, `total`, `total_pages`, `has_next`,
-  `has_previous`. Each quote has `text`, `author`, `source`, `tags`.
+  `has_previous`. Each quote has `text`, `author`, `source`, `tags`, `id`.
+
+- [GET {QUOTES_ENDPOINT}/daily]({base_url}{QUOTES_ENDPOINT}/daily): The day's selection, the
+  same for every caller until UTC midnight. Query parameters: `category`,
+  `page_size`. Adds `date` and `seed` to the response above.
 
 - [GET {CROSSWORD_ENDPOINT}]({base_url}{CROSSWORD_ENDPOINT}): Generates a playable crossword.
   Query parameters: `category` (animals, food, geography, music, science, sports),
@@ -550,11 +582,15 @@ is skipped rather than failing the request.
 - `page` (integer, optional, default 1, minimum 1): 1-based page number. A page
   beyond the available results returns an empty `quotes` list, not an error.
 - `page_size` (integer, optional, default {DEFAULT_PAGE_SIZE}, range 1-{MAX_PAGE_SIZE}): Quotes per page.
+- `seed` (integer, optional, minimum 1): Deterministically shuffle the whole
+  result set before paging. The same seed always returns the same quotes in the
+  same order, so pagination stays coherent; a different seed is a different
+  selection. Omit for the default most-prominent-first order.
 
 ### Response fields
 
 - `quotes` (array): The requested page. Each item has `text` (string),
-  `author` (string), `source` (`"toscrape"` or `"goodreads"`), and `tags`
+  `author` (string), `source` (`"toscrape"`, `"goodreads"` or `"wikiquote"`), and `tags`
   (array of strings, may be empty when the source lists none).
 - `category` (string or null): The normalized category that was applied.
 - `page`, `page_size` (integer): Echo of the pagination request.
@@ -603,10 +639,17 @@ Request: `GET {base_url}{QUOTES_ENDPOINT}?category=inspirational&page=1&page_siz
 """
     return PlainTextResponse(body)
 
+# Wikimedia answers generic browser User-Agent strings with a 403. Their policy
+# asks automated clients to identify themselves and give a way to be contacted,
+# so Wikiquote requests carry this instead of the session default.
+WIKIMEDIA_USER_AGENT = "QuotiaBot/1.0 (https://quotia.vercel.app; bieefilled@kwenuai.com.ng)"
+
+
 async def fetch(session: aiohttp.ClientSession, url: str) -> str:
     """Fetch the HTML content of a URL asynchronously."""
+    headers = {"User-Agent": WIKIMEDIA_USER_AGENT} if "wikiquote.org" in url else None
     try:
-        async with session.get(url) as response:
+        async with session.get(url, headers=headers) as response:
             if response.status != 200:
                 logger.error(f"Error fetching {url}: Status {response.status}")
                 return ""
@@ -676,7 +719,68 @@ async def scrape_quotes_goodreads(soup: BeautifulSoup) -> List[Dict[str, Any]]:
         logger.error(f"Error parsing goodreads quotes: {str(e)}")
     return quotes
 
-def build_source_urls(category: Optional[str], source_pages: int) -> List[str]:
+# Attribution on a Wikiquote theme page is a nested bullet under the quote, and
+# it is often "Name, ''Work'', ch. 4" or trails a [citation needed] marker.
+_WIKIQUOTE_CITATION = re.compile(r"\[\s*citation[^\]]*\]", re.IGNORECASE)
+_WIKIQUOTE_AUTHOR_TAIL = re.compile(r"\s*(?:,| in | as quoted in | — | - ).*$", re.IGNORECASE)
+
+
+def _wikiquote_clean(value: str) -> str:
+    return _WIKIQUOTE_CITATION.sub("", value).replace("\xa0", " ").strip(" —-,;:“”\"'")
+
+
+async def scrape_quotes_wikiquote(soup: BeautifulSoup, theme: str) -> List[Dict[str, Any]]:
+    """Scrape one Wikiquote theme page.
+
+    Only bullets that carry a nested attribution bullet are kept. Plenty of
+    entries are multi-line verse whose author sits in a sibling bullet, and
+    guessing at those risks attributing a quote to the wrong person — which then
+    gets rendered onto a share card. Skipping them is the cheaper mistake.
+    """
+    quotes: List[Dict[str, Any]] = []
+    try:
+        root = soup.find("div", class_="mw-parser-output")
+        if not root:
+            return quotes
+
+        for junk in root.select("sup, .mw-editsection, style, table, .thumb"):
+            junk.decompose()
+
+        for item in root.find_all("li"):
+            if item.find_parent("li"):
+                continue  # already consumed as somebody's attribution
+            nested = item.find("ul")
+            if not nested:
+                continue
+            attribution = nested.find("li")
+            if not attribution:
+                continue
+
+            author = _wikiquote_clean(attribution.get_text(" ", strip=True))
+            author = _wikiquote_clean(_WIKIQUOTE_AUTHOR_TAIL.sub("", author))
+            nested.extract()
+            text = clean_quote_text(_wikiquote_clean(item.get_text(" ", strip=True)))
+
+            # A real name, not the opening clause of a sentence about the quote.
+            if not (20 <= len(text) <= 600) or not (2 <= len(author) <= 45):
+                continue
+            if author.count(" ") > 4 or "." in author[:-1]:
+                continue
+
+            quotes.append({
+                "text": text,
+                "author": author,
+                "source": "wikiquote",
+                "tags": [theme.lower()],
+            })
+    except Exception as e:
+        logger.error(f"Error parsing wikiquote quotes: {str(e)}")
+    return quotes
+
+
+def build_source_urls(
+    category: Optional[str], source_pages: int, seed: Optional[int] = None
+) -> List[str]:
     """
     Build the list of source URLs to scrape, ordered page by page.
 
@@ -692,7 +796,31 @@ def build_source_urls(category: Optional[str], source_pages: int) -> List[str]:
         else:
             urls.append(f"http://quotes.toscrape.com/page/{n}/")
             urls.append(f"https://www.goodreads.com/quotes?page={n}")
+
+    # Wikiquote theme pages are not paginated — one page carries the lot, around
+    # 1300 quotes against roughly 20 from a page of either other source. They are
+    # also ~1.2MB and cost about half a second to parse, so exactly one is added
+    # per request rather than one per page.
+    theme = wikiquote_theme(category, seed)
+    if theme:
+        urls.append(f"https://en.wikiquote.org/wiki/{urlquote(theme, safe='')}")
     return urls
+
+
+def wikiquote_theme(category: Optional[str], seed: Optional[int]) -> Optional[str]:
+    """Pick the Wikiquote page to pull from.
+
+    A category maps straight onto a theme page, which is why the tag survives the
+    round trip. Without one, the theme rotates with the seed so the daily mix is
+    drawn from a different corner of the site each day instead of always Love.
+    """
+    if category:
+        # Wikiquote titles are capitalised and space-separated: "deep thoughts"
+        # has no page, and fetch() logs the 404 and moves on.
+        return category.replace("-", " ").replace("_", " ").strip().capitalize()
+    if not WIKIQUOTE_THEMES:
+        return None
+    return WIKIQUOTE_THEMES[(seed or 0) % len(WIKIQUOTE_THEMES)]
 
 def deduplicate(quotes: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     """Drop repeats, keeping first occurrence. Sources overlap and paginate inconsistently."""
@@ -718,6 +846,10 @@ async def scrape_url(session: aiohttp.ClientSession, url: str) -> List[Dict[str,
             return await scrape_quotes_toscrape(soup)
         elif "goodreads" in url:
             return await scrape_quotes_goodreads(soup)
+        elif "wikiquote" in url:
+            # The theme is the last path segment, and it is also the tag.
+            theme = unquote(url.rsplit("/", 1)[-1]).replace("_", " ")
+            return await scrape_quotes_wikiquote(soup, theme)
         return []
     except Exception as e:
         logger.error(f"Error scraping {url}: {str(e)}")
@@ -731,6 +863,7 @@ async def fetch_quotes(
     category: Optional[str] = None,
     page: int = 1,
     page_size: int = DEFAULT_PAGE_SIZE,
+    seed: Optional[int] = None,
 ) -> Dict[str, Any]:
     """
     Fetch quotes from every configured source, merge them, and return one page.
@@ -750,10 +883,15 @@ async def fetch_quotes(
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
     }
 
-    # Only scrape as deep as the requested window needs, up to the cap.
-    needed = page * page_size
-    source_pages = min(MAX_SOURCE_PAGES, ceil(needed / QUOTES_PER_SOURCE_PAGE))
-    urls = build_source_urls(category, source_pages)
+    # Only scrape as deep as the requested window needs, up to the cap. A seeded
+    # request is the exception: it reorders the whole corpus, so drawing from
+    # just the first page would shuffle ten quotes forever.
+    if seed is None:
+        needed = page * page_size
+        source_pages = min(MAX_SOURCE_PAGES, ceil(needed / QUOTES_PER_SOURCE_PAGE))
+    else:
+        source_pages = MAX_SOURCE_PAGES
+    urls = build_source_urls(category, source_pages, seed)
 
     async with aiohttp.ClientSession(headers=headers) as session:
         tasks = [scrape_url(session, url) for url in urls]
@@ -767,6 +905,14 @@ async def fetch_quotes(
                 logger.error(f"Error in gathering results: {str(result)}")
 
         unique_quotes = deduplicate(all_quotes)
+
+        # Seeded requests reorder the corpus before paging, so a given seed always
+        # yields the same quotes in the same order — pagination stays coherent,
+        # and a different seed is a genuinely different selection rather than a
+        # reshuffle of the same window.
+        if seed is not None:
+            random.Random(seed).shuffle(unique_quotes)
+
         total = len(unique_quotes)
         total_pages = ceil(total / page_size)
         start = (page - 1) * page_size
@@ -824,6 +970,15 @@ async def get_quotes(
         le=MAX_PAGE_SIZE,
         description=f"How many quotes to return per page (1-{MAX_PAGE_SIZE}).",
     ),
+    seed: Optional[int] = Query(
+        None,
+        ge=1,
+        description=(
+            "Shuffle the whole result set deterministically before paging. The same "
+            "seed always returns the same quotes in the same order; a new seed is a "
+            "different selection. Omit for the default, most-prominent-first order."
+        ),
+    ),
 ) -> Dict[str, Any]:
     """
     Fetch quotes from every configured source, merge them, and return one page.
@@ -841,10 +996,59 @@ async def get_quotes(
     Responses are cached for 5 minutes per `category`/`page`/`page_size`.
     """
     try:
-        return await fetch_quotes(category=category, page=page, page_size=page_size)
+        return await fetch_quotes(category=category, page=page, page_size=page_size, seed=seed)
     except Exception as e:
         logger.error(f"Error processing request: {str(e)}")
         raise HTTPException(status_code=500, detail="Internal server error")
+
+
+def daily_quote_seed(day: Optional[date_type] = None) -> tuple:
+    """Stable per-UTC-day seed for the quote rotation.
+
+    Same idea as crossword.daily_seed, but with its own hash prefix so the quote
+    of the day and the puzzle of the day do not rotate in lockstep.
+    """
+    day = day or datetime.now(timezone.utc).date()
+    iso = day.isoformat()
+    digest = hashlib.sha256(f"quotia-quotes-{iso}".encode()).hexdigest()
+    return int(digest[:8], 16) % (2**31 - 1) or 1, iso
+
+
+@app.get(
+    f"{QUOTES_ENDPOINT}/daily",
+    response_class=JSONResponse,
+    response_model=DailyQuotes,
+    tags=["quotes"],
+    summary="Today's quotes",
+    responses={500: {"model": ErrorResponse, "description": "The request failed unexpectedly."}},
+)
+async def get_daily_quotes(
+    category: Optional[str] = Query(
+        None,
+        description="Category (tag) to filter by, e.g. `love`. Omit for a mix.",
+        examples=["inspirational"],
+    ),
+    page_size: int = Query(
+        DEFAULT_PAGE_SIZE,
+        ge=1,
+        le=MAX_PAGE_SIZE,
+        description=f"How many quotes to return (1-{MAX_PAGE_SIZE}).",
+    ),
+) -> Dict[str, Any]:
+    """
+    The day's selection: the same quotes for every caller until UTC midnight.
+
+    The seed is derived from today's UTC date, so the set is stable within a day
+    and unrelated to yesterday's. Use this for a front page that should feel
+    fresh daily without being different on every reload.
+    """
+    seed, iso = daily_quote_seed()
+    try:
+        result = await fetch_quotes(category=category, page=1, page_size=page_size, seed=seed)
+    except Exception as e:
+        logger.error(f"Error processing daily request: {str(e)}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+    return {**result, "date": iso, "seed": seed}
 
 @app.get(
     CROSSWORD_ENDPOINT,
